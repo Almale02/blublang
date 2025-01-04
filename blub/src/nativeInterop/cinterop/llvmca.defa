@@ -1,0 +1,22 @@
+linkerOpts = -LC:/Users/gaspa/Desktop/llvm/llvm-16/llvm/build/lib -lLLVMLinker -lLLVMExecutionEngine \
+                                                                 -lLLVMLinker \
+                                                                 -lLLVMExecutionEngine \
+                                                                 -lLLVMAnalysis \
+                                                                 -lLLVMBitReader \
+                                                                 -lLLVMBitWriter \
+                                                                 -lLLVMTarget \
+                                                                 -lLLVMMC \
+                                                                 -lLLVMMCParser \
+                                                                 -lLLVMObject \
+                                                                 -lLLVMSupport \
+                                                                 -lLLVMRemarks \
+                                                                 -lLLVMBitReader \
+                                                                 -LLVMBitWriter \
+                                                                 -lLLVMBitstreamReader \
+                                                                 -lLLVMDemangle \
+                                                                 -lLLVMDebugInfoDWARF \
+                                                                 -lLLVMDWARFLinker \
+                                                                 -lLLVMDWARFLinkerParallel \
+                                                                 -lLLVMCore \
+                                                                 -lkernel32 -lole32 -luuid \
+

@@ -1,0 +1,66 @@
+# Gradle build folder
+.gradle/
+build/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# IntelliJ IDEA/Android Studio files
+.idea/
+*.iml
+
+# Exclude all .iml files
+*.iml
+
+# Exclude all .ipr files
+*.ipr
+
+# Exclude all .iws files
+*.iws
+
+# Exclude all .idea/ folders
+.idea/
+
+# Exclude all .DS_Store files (macOS)
+.DS_Store
+
+# Exclude all Thumbs.db files (Windows)
+Thumbs.db
+
+# Exclude all .stackdump files (Windows)
+*.stackdump
+
+# Exclude all .directory files (Linux)
+.directory
+
+# Exclude all .Trash-* folders (Linux)
+.Trash-*
+
+# Exclude all .nfs* files (Linux)
+.nfs*
+
+# Compiled class files
+*.class
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Exclude .kotlin folder
+.kotlin/
+
+# Android-specific files
+*.apk
+*.aar
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+captures/
+.externalNativeBuild/
+.cxx/

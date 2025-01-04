@@ -1,0 +1,49 @@
+
+# Ignore build directories recursively
+**/build/
+**/out/
+
+# Ignore Kotlin-specific files
+*.class
+*.kt.metadata
+*.kotlin_module
+*.log
+*.hprof
+
+# Ignore Gradle wrapper files
+.gradle/
+.gradle-cache/
+!gradle-wrapper.jar
+
+# Ignore Gradle configuration files
+.gradle/
+/.gradle-cache/
+.gradle-task-cache/
+*.gradle
+*.gradle.kts
+
+# Ignore IntelliJ IDEA / Android Studio files
+.idea/
+*.ipr
+*.iws
+*.iml
+.idea_modules/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+.idea/libraries/
+
+# Ignore other IDE-specific files
+.vscode/
+*.swp
+
+# Ignore dependency caches and logs
+**/.gradle/
+**/.idea/
+**/tmp/
+*.log
+
+# Ignore compiled JAR, WAR, and EAR files
+*.jar
+*.war
+*.ear
