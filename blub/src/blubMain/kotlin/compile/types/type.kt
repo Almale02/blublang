@@ -18,9 +18,11 @@ sealed class TypeInfo(val id: Int): LongHashCode {
     data class Number(val number: NumberTypes) : TypeInfo(2)
     data class Array(val handle: TypeHandle) : TypeInfo(3)
     data class Pointer(val isMut: Boolean, val pointee: TypeHandle) : TypeInfo(4)
-    object Str : TypeInfo(5)
-    object Unit : TypeInfo(6)
-    object Bool : TypeInfo(7)
+    // every other variant in type info is an instance of a type, but variables, CodeExprHandles refer to a type, not an instance of a type
+    object StaticType: TypeInfo(5)
+    object Str : TypeInfo(6)
+    object Unit : TypeInfo(7)
+    object Bool : TypeInfo(8)
 
     @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
     override fun longHashCode(hasher: Digest<*>) {
@@ -29,26 +31,22 @@ sealed class TypeInfo(val id: Int): LongHashCode {
             is Array -> {
                 hasher.update(this.handle.toByteArray())
             }
-
             is Struct -> {
                 // it is enough to hash the name because the names are unique across structs
                 hasher.update(name.encodeToByteArray())
             }
-
             is Fn -> {
                 hasher.update(returnTypeHandle.toByteArray())
                 args.forEach { hasher.update(it.toByteArray()) }
             }
-
             is Number -> {
                 hasher.update(number.id.toByteArray())
             }
-
             is Pointer -> {
                 hasher.update(isMut.toByte())
                 hasher.update(pointee.toByteArray())
             }
-
+            is StaticType -> {}
             is Bool -> {}
             is Str -> {}
             is Unit -> {}
@@ -91,13 +89,16 @@ sealed class TypeInfo(val id: Int): LongHashCode {
             is Number -> {
                 this.number.display()
             }
+            is StaticType -> {
+                "StaticType()"
+            }
             Unit -> "Unit"
             Bool -> "bool"
             Str -> "str"
         }
     }
 }
-data class StructField(val name: String, val typeHandle: TypeHandle)
+data class StructField(val name: String, val typeHandle: TypeHandle, val isStatic: Boolean = false)
 data class TypeHandle(val handle: ULong): LongHashCode {
     fun toByteArray(): ByteArray {
         return handle.toByteArray()
@@ -111,6 +112,9 @@ data class TypeHandle(val handle: ULong): LongHashCode {
         return TypeRegistry.typeHandleToInfo[this]!!.display()
     }
 
+    override fun toString(): String {
+        return display()
+    }
 }
 enum class NumberTypes(val id: Int) {
     I8(1),
@@ -193,6 +197,7 @@ object TypeRegistry {
         addType(TypeInfo.Unit)
         addType(TypeInfo.Str)
         addType(TypeInfo.Bool)
+        addType(TypeInfo.StaticType)
         addType(TypeInfo.Number(NumberTypes.I8))
         addType(TypeInfo.Number(NumberTypes.I16))
         addType(TypeInfo.Number(NumberTypes.I32))

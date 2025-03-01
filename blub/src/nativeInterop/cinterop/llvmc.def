@@ -1,5 +1,36 @@
 headers = llvm-c/Core.h llvm-c/ExecutionEngine.h llvm-c/Linker.h
 
+
+headers = \
+		 llvm-c/Analysis.h \
+         llvm-c/BitReader.h \
+         llvm-c/BitWriter.h \
+         llvm-c/Comdat.h \
+         llvm-c/Core.h \
+         llvm-c/DataTypes.h \
+         llvm-c/DebugInfo.h \
+         llvm-c/Deprecated.h \
+         llvm-c/Disassembler.h \
+         llvm-c/DisassemblerTypes.h  \
+         llvm-c/Error.h \
+         llvm-c/ErrorHandling.h \
+         llvm-c/ExecutionEngine.h \
+         llvm-c/ExternC.h \
+         llvm-c/IRReader.h \
+         llvm-c/LLJIT.h \
+         llvm-c/LLJITUtils.h \
+         llvm-c/Linker.h \
+         llvm-c/Object.h \
+         llvm-c/Orc.h \
+         llvm-c/OrcEE.h \
+         llvm-c/Remarks.h \
+         llvm-c/Support.h \
+         llvm-c/Target.h \
+         llvm-c/TargetMachine.h \
+         llvm-c/Types.h \
+         llvm-c/blake3.h \
+         llvm-c/lto.h \
+
 compilerOpts = -IC:/Users/gaspa/Desktop/llvm/llvm-19.1.6/llvm/include -IC:/Users/gaspa/Desktop/llvm/llvm-19.1.6/llvm/build/include
 linkerOpts = -v -LC:/Users/gaspa/Desktop/llvm/llvm-19.1.6/llvm/build/lib \
 													-lDynamicLibraryLib \

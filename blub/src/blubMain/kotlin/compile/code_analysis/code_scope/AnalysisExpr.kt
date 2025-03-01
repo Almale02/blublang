@@ -8,6 +8,7 @@ sealed class AnalysisExpr() {
     object String: AnalysisExpr()
     data class Ident(val base: CodeExprHandle, val access: Array<kotlin.String>): AnalysisExpr()
     data class Call(val base: CodeExprHandle, val args: Array<CodeExprHandle>): AnalysisExpr()
+    data class StructCreate(val base: CodeExprHandle, val args: Array<Pair<kotlin.String, CodeExprHandle>>): AnalysisExpr()
     data class Binary(val lhs: CodeExprHandle, val op: Token, val rhs: CodeExprHandle): AnalysisExpr()
     data class FnArg(val name: kotlin.String, val argType: TypeHandle): AnalysisExpr()
     data class CaptureVar(val isMut: Boolean, val varType: TypeHandle, val name: kotlin.String): AnalysisExpr()

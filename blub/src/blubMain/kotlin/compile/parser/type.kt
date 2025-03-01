@@ -1,5 +1,6 @@
 package compile.parser
 
+import arrow.core.Either
 import compile.lexer.Token
 import compile.lexer.TokenId
 import compilerError
@@ -24,7 +25,10 @@ fun Parser.parseType(bp: BindingPower): AstType {
     return left
 }
 fun Parser.parseSymbolType(): AstType {
-    return AstType.Symbol(advanceExpect(TokenId.Ident).let { (it as Token.Ident).ident })
+    return AstType.Symbol(advanceExpect(TokenId.Ident).let { (when (it) {
+        is Either.Left -> it.value
+        is Either.Right -> compilerError(it.value.msg)
+    } as Token.Ident).ident })
 }
 fun Parser.parseArrayType(): AstType {
     advanceExpect(TokenId.OpenBracket)

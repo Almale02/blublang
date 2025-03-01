@@ -1,15 +1,21 @@
 package compile.parser
 
+import arrow.core.Either
+import arrow.core.left
+import arrow.core.right
 import compile.lexer.Token
 import compile.lexer.TokenId
 import compilerError
 
 typealias StmtHandler = Parser.() -> Stmt
-typealias NudHandler = Parser.() -> Expr
-typealias LedHandler = Parser.(Expr, BindingPower) -> Expr
+typealias NudHandler = Parser.() -> Either<Expr, ParseExprError>
+typealias LedHandler = Parser.(Expr, BindingPower) -> Either<Expr, ParseExprError>
 
 typealias TypeNudHandler = Parser.() -> AstType
 typealias TypeLedHandler = Parser.(AstType, BindingPower) -> AstType
+
+data class ParseExprError(val msg: String, val parsedSuccessfully: Expr? = null)
+
 
 class Parser(val tokens: Array<Token>) {
     var head: Int = 0
@@ -39,6 +45,14 @@ class Parser(val tokens: Array<Token>) {
         }
         return body.toTypedArray()
     }
+    fun remainder(): String {
+        var string = "\n"
+        for (token in tokens.slice(head..tokens.lastIndex)) {
+            string += token.string_repr
+            string += "\n"
+        }
+        return string
+    }
     fun advance(): Token {
         if (hasFinished())
             compilerError("reached eof before expected")
@@ -52,12 +66,12 @@ class Parser(val tokens: Array<Token>) {
         }
         return curr
     }
-    fun advanceExpect(expected: TokenId): Token {
+    fun advanceExpect(expected: TokenId): Either<Token, ParseExprError> {
         val token = currToken()
         if (token.id != expected)
-            compilerError("expected token $expected, but found: ${token.id}")
+            return ParseExprError("expected token $expected, but found: ${token.id}").right()
 
-        return advance()
+        return advance().left()
     }
     fun advanceExpectManual(expected: TokenId): Token? {
         if (currToken().id != expected)
@@ -118,6 +132,8 @@ class Parser(val tokens: Array<Token>) {
         led(TokenId.Percent, BindingPower.Multiplicative, Parser::parseBinaryExpr)
         //
         led(TokenId.OpenParen, BindingPower.Call, Parser::parseCall)
+        //
+        led(TokenId.OpenBlock, BindingPower.Primary, Parser::parseStructCreate)
         //
         //
         stmt(TokenId.Let, Parser::parseVarDeclStmt);

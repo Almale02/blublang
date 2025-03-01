@@ -50,22 +50,23 @@ class Lexer(private val code: String) {
                 }
                 false
             },
-            defaultHandler(Regex("let"), Token.Let),
-            defaultHandler(Regex("mut"), Token.Mut),
+            keywordHandler("let", Token.Let),
+            keywordHandler("mut", Token.Mut),
             //
-            defaultHandler(Regex("use"), Token.Use),
-            defaultHandler(Regex("fn"), Token.Fn),
-            defaultHandler(Regex("for"), Token.For),
-            defaultHandler(Regex("in"), Token.In),
-            defaultHandler(Regex("loop"), Token.Loop),
-            defaultHandler(Regex("match"), Token.Match),
-            defaultHandler(Regex("if"), Token.If),
-            defaultHandler(Regex("struct"), Token.Struct),
-            defaultHandler(Regex("pub"), Token.Pub),
+            keywordHandler("use", Token.Use),
+            keywordHandler("fn", Token.Fn),
+            keywordHandler("for", Token.For),
+            keywordHandler("in", Token.In),
+            keywordHandler("loop", Token.Loop),
+            keywordHandler("match", Token.Match),
+            keywordHandler("if", Token.If),
+            keywordHandler("struct", Token.Struct),
+            keywordHandler("pub", Token.Pub),
+            //
+            keywordHandler("or", Token.Or),
+            keywordHandler("and", Token.And),
+            //
             defaultHandler(Regex("@"), Token.At),
-            //
-            defaultHandler(Regex("or"), Token.Or),
-            defaultHandler(Regex("and"), Token.And),
             //
             //
             identifierHandler(),
@@ -105,6 +106,16 @@ class Lexer(private val code: String) {
             defaultHandler(Regex("\\*"), Token.Star),
             defaultHandler(Regex("%"), Token.Percent)
         )}
+}
+fun keywordHandler(keyword: String, token: Token): LexerHandler {
+    return handler@{
+        val res = Regex("${keyword}\\s").matchAt(remCode, 0) ?: return@handler false
+        setHead(head + res.range.last +1)
+        handleWhitespace()
+        tokens.add(token)
+
+        true
+    }
 }
 fun stringHandler(): LexerHandler {
     return handler@{

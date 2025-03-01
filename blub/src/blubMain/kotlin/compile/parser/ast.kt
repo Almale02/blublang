@@ -8,6 +8,7 @@ sealed class Expr(val id: ExprId) {
     data class Ident(val ident: Array<kotlin.String>): Expr(ExprId.Ident)
     data class Call(val base: Expr, val args: Array<Expr>): Expr(ExprId.Call)
     data class Binary(val left: Expr, val op: Token, val right: Expr): Expr(ExprId.Binary)
+    data class StructCreate(val struct: Expr.Ident, val fields: Array<Pair<kotlin.String, Expr>>): Expr(ExprId.StructCreate)
 
     override fun toString(): kotlin.String {
         return when (this) {
@@ -16,6 +17,7 @@ sealed class Expr(val id: ExprId) {
             is Ident -> "identifier"
             is Call -> "call expression"
             is Binary -> "binary expression"
+            is StructCreate -> "struct create expression"
         }
     }
 }
@@ -25,6 +27,7 @@ enum class ExprId {
     Ident,
     Call,
     Binary,
+    StructCreate
 }
 sealed class Stmt(val id: StmtId) {
     data class VarDecl(val name: String, val isMut: Boolean, val initValue: Expr?): Stmt(StmtId.VarDecl)

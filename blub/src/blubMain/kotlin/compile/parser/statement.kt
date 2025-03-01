@@ -1,17 +1,21 @@
 package compile.parser
 
+import arrow.core.Either
+import arrow.core.left
 import compile.lexer.Token
 import compile.lexer.TokenId
 import compilerError
+import compilerICE
 
 fun Parser.parseStmt(): Stmt {
     stmtLookup[currToken().id]?.run {
         return this()
     }
     val expr = parseExpr(BindingPower.Default)
+    expr.getOrNull()?.let { compilerError(it.msg) }
     advanceExpectManual(TokenId.SemiColon) ?: compilerError("this is not python idiot")
 
-    return Stmt.ExprStmt(expr)
+    return Stmt.ExprStmt(expr.leftOrNull()!!)
 }
 fun Parser.parseBlock(): Array<Stmt> {
     val block = arrayListOf<Stmt>()
@@ -27,30 +31,53 @@ fun Parser.parseVarDeclStmt(): Stmt {
 
     if (!isMut)
         backtrack()
-    val name = advanceExpect(TokenId.Ident).let { (it as Token.Ident).ident }
+    val name = when (val x = advanceExpect(TokenId.Ident)) {
+        is Either.Left -> x.value
+        is Either.Right -> compilerError(x.value.msg)
+    }.let { (it as Token.Ident).ident }
     advanceExpect(TokenId.Assignment)
 
     if (currToken().id == TokenId.SemiColon)
        return Stmt.VarDecl(name, isMut, null)
 
-    val initValue = parseExpr(BindingPower.Default)
+    val initValue = when (val expr = parseExpr(BindingPower.Default)) {
+        is Either.Left -> expr.value
+        is Either.Right -> compilerError(expr.value.msg)
+    }
     advanceExpect(TokenId.SemiColon)
 
     return Stmt.VarDecl(name, isMut, initValue)
 }
 fun Parser.parseForStmt(): Stmt {
     advance()
-    val capture = parseExpr(BindingPower.Default)
+    val capture = when (val x = parseExpr(BindingPower.Default)) {
+        is Either.Left -> x.value
+        is Either.Right -> compilerError(x.value.msg)
+    }
     advanceExpect(TokenId.In)
-    val iterator = parseExpr(BindingPower.Default)
-    advanceExpect(TokenId.OpenBlock)
+    var iterator = parseExpr(BindingPower.Default)
+
+    iterator.getOrNull()?.let { it ->
+        it.parsedSuccessfully?.let {
+            iterator = it.left()
+        }
+    }
+    advanceExpect(TokenId.OpenBlock).getOrNull()?.let { openBlockMsg ->
+        iterator.getOrNull()?.let {
+            compilerError(it.msg)
+        }
+        compilerError("this ${openBlockMsg.msg}")
+    }
     val body = parseBlock()
     advanceExpect(TokenId.CloseBlock)
-    return Stmt.For(capture, iterator, body)
+    return Stmt.For(capture, iterator.leftOrNull() ?: compilerICE("this is fucking up"), body)
 }
 fun Parser.parseIfStmt(): Stmt {
     advance()
-    val guard = parseExpr(BindingPower.Default)
+    val guard = when (val x = parseExpr(BindingPower.Default)) {
+        is Either.Left -> x.value
+        is Either.Right -> compilerError(x.value.msg)
+    }
     advanceExpect(TokenId.OpenBlock)
     val body = parseBlock()
     advanceExpect(TokenId.CloseBlock)
@@ -65,7 +92,10 @@ fun Parser.parseFunctionDeclStmt(): Stmt {
     val isExtern = currToken().id == TokenId.At
     if (isExtern)
         advance()
-    val name = advanceExpect(TokenId.Ident).let { (it as Token.Ident).ident }
+    val name = when (val x = advanceExpect(TokenId.Ident)) {
+        is Either.Left -> x.value
+        is Either.Right -> compilerError(x.value.msg)
+    }.let { (it as Token.Ident).ident }
     advanceExpect(TokenId.OpenParen)
 
     while (true) {
@@ -73,7 +103,10 @@ fun Parser.parseFunctionDeclStmt(): Stmt {
             advance()
             break
         }
-        val argName = advanceExpect(TokenId.Ident).let { (it as Token.Ident).ident }
+        val argName = advanceExpect(TokenId.Ident).let { (when (it) {
+            is Either.Left -> it.value
+            is Either.Right -> compilerError(it.value.msg)
+        } as Token.Ident).ident }
         advanceExpect(TokenId.Colon)
         val argType = parseType(BindingPower.Default)
 
@@ -103,7 +136,10 @@ fun Parser.parseStructDeclStmt(): Stmt {
     if (isExtern) {
         advance()
     }
-    val structName = advanceExpect(TokenId.Ident).let { (it as Token.Ident).ident }
+    val structName = advanceExpect(TokenId.Ident).let { (when (it) {
+        is Either.Left -> it.value
+        is Either.Right -> compilerError(it.value.msg)
+    } as Token.Ident).ident }
     advanceExpect(TokenId.OpenBlock)
 
     while (true) {
@@ -112,7 +148,10 @@ fun Parser.parseStructDeclStmt(): Stmt {
         val isFieldPub = currToken().id == TokenId.Pub
         if (isFieldPub)
            advance()
-        val fieldName = advanceExpect(TokenId.Ident).let { (it as Token.Ident).ident }
+        val fieldName = advanceExpect(TokenId.Ident).let { (when (it) {
+            is Either.Left -> it.value
+            is Either.Right -> compilerError(it.value.msg)
+        } as Token.Ident).ident }
 
         advanceExpect(TokenId.Colon)
         val fieldType = parseType(BindingPower.Default)
@@ -121,7 +160,10 @@ fun Parser.parseStructDeclStmt(): Stmt {
         val defaultValue = hasDefaultValue.let {
             if (it) {
                 advanceExpect(TokenId.Assignment)
-                parseExpr(BindingPower.Default)
+                when (val x = parseExpr(BindingPower.Default)) {
+                    is Either.Left -> x.value
+                    is Either.Right -> compilerError(x.value.msg)
+                }
             } else {
                 null
             }

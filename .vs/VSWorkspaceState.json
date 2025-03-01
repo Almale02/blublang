@@ -1,0 +1,18 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\blub",
+    "\\blub\\build",
+    "\\blub\\build\\bin",
+    "\\blub\\build\\bin\\blub",
+    "\\blub\\build\\bin\\blub\\debugExecutable",
+    "\\blub\\src",
+    "\\blub\\src\\blubMain",
+    "\\blub\\src\\blubMain\\kotlin",
+    "\\blub\\src\\blubMain\\kotlin\\compile",
+    "\\blub\\src\\blubMain\\kotlin\\compile\\code_analysis",
+    "\\blub\\src\\blubMain\\kotlin\\compile\\code_analysis\\code_scope"
+  ],
+  "SelectedNode": "\\blub\\build\\bin\\blub\\debugExecutable\\blub.exe",
+  "PreviewInSolutionExplorer": true
+}
