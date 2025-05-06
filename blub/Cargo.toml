@@ -1,0 +1,11 @@
+[package]
+name = "blublang"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+colored = "3.0.0"
+enum-as-inner = "0.6.1"
+inkwell = { version = "0.5.0", features = ["llvm-sys-180", "llvm18-0"] }
+petgraph = "0.8.1"
+regex = "1.11.1"
