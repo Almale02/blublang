@@ -10,65 +10,85 @@ use super::code_scope::{CodeExprHandle, CodeScopeHandle};
 
 #[derive(Debug, Clone, EnumAsInner)]
 pub enum AnalysisExpr {
-    Number(Number),
-    String(String),
+    Number {
+        num: Number,
+        expr: CodeExprHandle,
+    },
+    String {
+        string: String,
+        expr: CodeExprHandle,
+    },
     Ident {
         name: String,
+        expr: CodeExprHandle,
     },
     Access {
         base: CodeExprHandle,
         ident: String,
+        expr: CodeExprHandle,
     },
     Call {
         base: CodeExprHandle,
         args: Vec<CodeExprHandle>,
+        expr: CodeExprHandle,
     },
     StructCreate {
         base: CodeExprHandle,
         args: Vec<(String, CodeExprHandle)>,
+        expr: CodeExprHandle,
     },
     Comparison {
         lhs: CodeExprHandle,
         op: Token,
         rhs: CodeExprHandle,
+        expr: CodeExprHandle,
     },
     Assignment {
         lhs: CodeExprHandle,
         op: Token,
         rhs: CodeExprHandle,
+        expr: CodeExprHandle,
     },
     Arithmetic {
         lhs: CodeExprHandle,
         op: Token,
         rhs: CodeExprHandle,
+        expr: CodeExprHandle,
     },
     Range {
         lhs: CodeExprHandle,
         op: Token,
         rhs: CodeExprHandle,
+        expr: CodeExprHandle,
     },
     FnArg {
         name: String,
         arg_type: TypeHandle,
+        expr: CodeExprHandle,
     },
     CaptureVar {
         name: String,
         is_mut: bool,
         var_expr: CodeExprHandle,
+        expr: CodeExprHandle,
     },
     Index {
         base: CodeExprHandle,
         index: CodeExprHandle,
+        expr: CodeExprHandle,
     },
     Ref {
         is_mut: bool,
         pointee: CodeExprHandle,
+        expr: CodeExprHandle,
     },
     Group {
         inner: CodeExprHandle,
+        expr: CodeExprHandle,
     },
     ArrayInit {
         kind: ArrayInitAnalysisKind,
+        expr: CodeExprHandle,
     },
 }
 #[derive(Debug, Clone, EnumAsInner)]

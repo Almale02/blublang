@@ -28,6 +28,7 @@ fn validate(block: &[Stmt], is_top_level: bool) {
             Stmt::FuncDecl { body, .. } => validate(body, false),
             Stmt::StructDecl { .. } => (),
             Stmt::ExprStmt(_) => (),
+            Stmt::Retrun(_) => (),
         }
     }
 }

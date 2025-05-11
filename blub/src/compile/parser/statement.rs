@@ -231,8 +231,31 @@ impl Parser<'_> {
             return_type,
         }
     }
+    pub fn parse_return_stmt(&mut self) -> ParseStmtRes {
+        self.advance();
+        let expr = self.parse_expr(BindingPower::Default);
+        self.advance_expect(TokenId::SemiColon);
+
+        return Stmt::Retrun(expr);
+    }
 }
 /*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

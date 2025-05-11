@@ -1,0 +1,16 @@
+fn main() {
+	let arr = [1,2,3];
+	print_u64_arr(arr);
+	print_u64(arr[0]);
+
+}
+fn print_u32(x: u32): u8 {
+	let a = 2;
+	let b = 1;
+	a = b;
+	b = x;
+	return b;
+}
+fn print_u64(x: u64) {}
+fn print_u32_arr(x: u32) {}
+fn print_u64_arr(x: []u64) {}

@@ -152,6 +152,7 @@ pub enum Stmt {
         fields: Vec<AstStructField>,
     },
     ExprStmt(Expr),
+    Retrun(Expr),
 }
 impl Stmt {
     pub fn to_id(&self) -> StmtId {
@@ -162,6 +163,7 @@ impl Stmt {
             Stmt::FuncDecl { .. } => StmtId::FuncDecl,
             Stmt::StructDecl { .. } => StmtId::StructDecl,
             Stmt::ExprStmt(_) => StmtId::ExprStmt,
+            Stmt::Retrun(_) => StmtId::Return,
         }
     }
 }
@@ -173,6 +175,7 @@ pub enum StmtId {
     FuncDecl,
     StructDecl,
     ExprStmt,
+    Return,
 }
 impl StmtId {
     pub fn is_top_level(&self) -> bool {
@@ -183,6 +186,7 @@ impl StmtId {
             StmtId::FuncDecl => true,
             StmtId::StructDecl => true,
             StmtId::ExprStmt => false,
+            StmtId::Return => false,
         }
     }
     pub fn is_block_level(&self) -> bool {
@@ -193,6 +197,7 @@ impl StmtId {
             StmtId::FuncDecl => false,
             StmtId::StructDecl => false,
             StmtId::ExprStmt => true,
+            StmtId::Return => true,
         }
     }
 }
@@ -205,6 +210,7 @@ impl Display for StmtId {
             StmtId::FuncDecl => "func decl",
             StmtId::StructDecl => "struct decl",
             StmtId::ExprStmt => "expr stmt",
+            StmtId::Return => "return stmt",
         })
     }
 }

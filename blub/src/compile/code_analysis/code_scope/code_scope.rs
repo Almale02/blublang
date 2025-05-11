@@ -37,6 +37,7 @@ pub struct CodeSubExprHandle(pub u64);
 pub struct CodeScope {
     pub handle: CodeScopeHandle,
     pub parent: Option<CodeScopeHandle>,
+    pub in_fn: Option<String>,
     //
     pub stmts: Vec<AnalysisStmt>,
     pub var_name_to_expr: HashMap<String, CodeExprHandle>,
@@ -47,10 +48,15 @@ pub enum TypeOrInferHandle {
     Infer(InferTypeHandle),
 }
 impl CodeScope {
-    pub fn new(handle: CodeScopeHandle, parent: Option<CodeScopeHandle>) -> Self {
+    pub fn new(
+        handle: CodeScopeHandle,
+        parent: Option<CodeScopeHandle>,
+        in_fn: Option<String>,
+    ) -> Self {
         Self {
             handle,
             parent,
+            in_fn,
             stmts: Vec::new(),
             var_name_to_expr: HashMap::new(),
         }
@@ -98,7 +104,10 @@ impl CodeScope {
         match expr {
             Expr::Number(number) => {
                 let expr_handle = parser.new_expr(self.handle);
-                let analysis_expr = AnalysisExpr::Number(number.clone());
+                let analysis_expr = AnalysisExpr::Number {
+                    num: number.clone(),
+                    expr: expr_handle,
+                };
                 parser.add_type_infer(expr_handle, Box::new(|type_handle, _reg| type_handle));
                 parser.add_expr_infer_validator(
                     expr_handle,
@@ -120,7 +129,10 @@ impl CodeScope {
             }
             Expr::String(string) => {
                 let expr_handle = parser.new_expr(self.handle);
-                let analysis_expr = AnalysisExpr::String(string.clone());
+                let analysis_expr = AnalysisExpr::String {
+                    string: string.clone(),
+                    expr: expr_handle,
+                };
                 let type_handle = type_reg.get_type_handle(&TypeInfo::Str);
 
                 parser.expr_type_map.insert(expr_handle, type_handle);
@@ -161,9 +173,13 @@ impl CodeScope {
                         base_name
                     );
                 }
-                parser
-                    .expr_to_analysis
-                    .insert(expr_handle, AnalysisExpr::Ident { name: base_name });
+                parser.expr_to_analysis.insert(
+                    expr_handle,
+                    AnalysisExpr::Ident {
+                        name: base_name,
+                        expr: expr_handle,
+                    },
+                );
 
                 expr_handle
             }
@@ -192,6 +208,7 @@ impl CodeScope {
                                 AnalysisExpr::Access {
                                     base: left_expr_handle,
                                     ident,
+                                    expr: expr_handle,
                                 },
                             );
                         } else {
@@ -263,6 +280,7 @@ impl CodeScope {
                         AnalysisExpr::Call {
                             base: base_expr_handle,
                             args,
+                            expr: expr_handle,
                         },
                     );
                     return expr_handle;
@@ -350,6 +368,7 @@ impl CodeScope {
                         lhs: left_expr_handle,
                         op,
                         rhs: right_expr_handle,
+                        expr: expr_handle,
                     },
                 );
 
@@ -416,6 +435,7 @@ impl CodeScope {
                         lhs: left_expr_handle,
                         op,
                         rhs: right_expr_handle,
+                        expr: expr_handle,
                     },
                 );
 
@@ -472,6 +492,7 @@ impl CodeScope {
                         lhs: left_expr_handle,
                         op,
                         rhs: right_expr_handle,
+                        expr: expr_handle,
                     },
                 );
 
@@ -529,6 +550,7 @@ impl CodeScope {
                         lhs: left_expr_handle,
                         op,
                         rhs: right_expr_handle,
+                        expr: expr_handle,
                     },
                 );
 
@@ -599,6 +621,7 @@ impl CodeScope {
                     AnalysisExpr::StructCreate {
                         base: struct_ident_expr_handle,
                         args: analysis_fields,
+                        expr: expr_handle,
                     },
                 );
                 expr_handle
@@ -649,6 +672,7 @@ impl CodeScope {
                     AnalysisExpr::Index {
                         base: base_expr_handle,
                         index: index_expr_handle,
+                        expr: expr_handle,
                     },
                 );
 
@@ -683,9 +707,14 @@ impl CodeScope {
                         }),
                     );
                 };
-                parser
-                    .expr_to_analysis
-                    .insert(expr_handle, AnalysisExpr::Ref { is_mut, pointee });
+                parser.expr_to_analysis.insert(
+                    expr_handle,
+                    AnalysisExpr::Ref {
+                        is_mut,
+                        pointee,
+                        expr: expr_handle,
+                    },
+                );
 
                 expr_handle
             }
@@ -697,6 +726,7 @@ impl CodeScope {
                     expr_handle,
                     AnalysisExpr::Group {
                         inner: inner_expr_handle,
+                        expr: expr_handle,
                     },
                 );
 
@@ -751,6 +781,7 @@ impl CodeScope {
                                     value: init_expr_handle,
                                     count: init_expr_handle,
                                 },
+                                expr,
                             },
                         );
                     }
@@ -824,6 +855,7 @@ impl CodeScope {
                             expr,
                             AnalysisExpr::ArrayInit {
                                 kind: ArrayInitAnalysisKind::InitItems { items },
+                                expr,
                             },
                         );
                     }
@@ -858,7 +890,7 @@ impl CodeScope {
             Stmt::If { guard, body } => {
                 let guard_expr_handle = self.parse_ast_expr(guard, data);
                 let _ = parser.get_expected_info_expr_type(guard_expr_handle, TypeInfo::Bool, data);
-                let new_scope_handle = parser.new_scope(Some(self.handle));
+                let new_scope_handle = parser.new_scope(Some(self.handle), self.in_fn.clone());
                 let new_scope = parser.get_scope_mut(new_scope_handle);
                 new_scope.parse_code_block(body, data);
 
@@ -875,7 +907,7 @@ impl CodeScope {
             } => {
                 let iter_expr_handle = self.parse_ast_expr(iter, data);
 
-                let new_scope_handle = parser.new_scope(Some(self.handle));
+                let new_scope_handle = parser.new_scope(Some(self.handle), self.in_fn.clone());
                 let mut capture_vars = Vec::new();
 
                 let mut captured_var_exprs = Vec::new();
@@ -889,6 +921,7 @@ impl CodeScope {
                             name: x.clone(),
                             is_mut: false,
                             var_expr: capture_expr_handle,
+                            expr: capture_expr_handle,
                         });
 
                         parser
@@ -921,6 +954,7 @@ impl CodeScope {
                                 name: x.clone(),
                                 is_mut: false,
                                 var_expr: capture_expr_handle,
+                                expr: capture_expr_handle,
                             },
                         );
                     }
@@ -939,7 +973,7 @@ impl CodeScope {
             Stmt::FuncDecl {
                 name, args, body, ..
             } => {
-                let new_scope_handle = parser.new_scope(Some(self.handle));
+                let new_scope_handle = parser.new_scope(Some(self.handle), Some(name.clone()));
                 let fn_type_handle = type_reg.fn_name_to_handle.get(&name).cloned().unwrap();
                 let fn_info = type_reg.get_type_info(fn_type_handle);
                 let (_, type_fn_args) = fn_info.clone().into_fn().unwrap();
@@ -953,6 +987,7 @@ impl CodeScope {
                         AnalysisExpr::FnArg {
                             name: arg.name.clone(),
                             arg_type,
+                            expr: arg_expr_handle,
                         },
                     );
                     parser
@@ -993,6 +1028,27 @@ impl CodeScope {
             }
             Stmt::ExprStmt(expr) => {
                 let expr_handle = self.parse_ast_expr(expr, data);
+                self.stmts.push(AnalysisStmt::ExprStmt {
+                    stmt,
+                    expr: expr_handle,
+                });
+            }
+            Stmt::Retrun(expr) => {
+                let expr_handle = self.parse_ast_expr(expr, data);
+                let in_fn = self.in_fn.clone().unwrap();
+                let (ret_type, _) = type_reg
+                    .get_type_info(*type_reg.fn_name_to_handle.get(&in_fn).unwrap())
+                    .into_fn()
+                    .unwrap();
+
+                if let Err(got) = parser.get_expected_expr_type(expr_handle, ret_type, data) {
+                    blub_compile_error!(
+                        "expected {} but got {}",
+                        type_reg.type_to_string(ret_type),
+                        type_reg.type_to_string(got)
+                    );
+                }
+
                 self.stmts.push(AnalysisStmt::ExprStmt {
                     stmt,
                     expr: expr_handle,
@@ -1297,7 +1353,11 @@ impl CodeScopeParser {
         self.sub_expr_to_code_scope.insert(handle, scope);
         handle
     }
-    pub fn new_scope(&mut self, parent: Option<CodeScopeHandle>) -> CodeScopeHandle {
+    pub fn new_scope(
+        &mut self,
+        parent: Option<CodeScopeHandle>,
+        in_fn: Option<String>,
+    ) -> CodeScopeHandle {
         let new_scope_handle = CodeScopeHandle(self.next_scope_handle);
         self.next_scope_handle += 1;
         self.parent_map.insert(new_scope_handle, HashSet::new());
@@ -1312,12 +1372,14 @@ impl CodeScopeParser {
                 .unwrap()
                 .extend(parents_parents.iter());
         }
-        self.scopes
-            .insert(new_scope_handle, CodeScope::new(new_scope_handle, parent));
+        self.scopes.insert(
+            new_scope_handle,
+            CodeScope::new(new_scope_handle, parent, in_fn),
+        );
         new_scope_handle
     }
     pub fn new_root_scope(&mut self) -> &mut CodeScope {
-        let handle = self.new_scope(None);
+        let handle = self.new_scope(None, None);
         self.get_scope_mut(handle)
     }
     pub fn get_scope_mut(&mut self, scope: CodeScopeHandle) -> &mut CodeScope {

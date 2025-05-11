@@ -83,6 +83,7 @@ impl ParserHandlers {
         self.led(TokenId::OpenBracket, BindingPower::Call, Box::new(|parser, expr, bp| Parser::parse_index(parser, expr, bp)) );
         //
         //
+        self.stmt(TokenId::Return, Box::new(|x| Parser::parse_return_stmt(x)));
         self.stmt(TokenId::Let, Box::new(|x| Parser::parse_var_declare_stmt(x)));
         self.stmt(TokenId::For, Box::new(|x| Parser::parse_for_stmt(x)));
         self.stmt(TokenId::If, Box::new(|x| Parser::parse_if_stmt(x)));

@@ -71,6 +71,7 @@ fn main() {
                 //
                 //
                 let root_scope = code_scope_parser.new_root_scope();
+
                 root_scope.parse_code_block(ast, &code_analyzer_data);
                 println!("{}", "finished".bright_green());
                 exit(0);

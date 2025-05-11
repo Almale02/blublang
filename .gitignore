@@ -42,6 +42,7 @@ config.mk
 config.stamp
 no_llvm_build
 
+Cargo.lock
 ## Build
 /dl/
 /doc/

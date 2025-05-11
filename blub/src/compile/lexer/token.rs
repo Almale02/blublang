@@ -62,6 +62,7 @@ pub enum TokenId {
     Struct,
     Pub,
     Trait,
+    Return,
 }
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -118,6 +119,7 @@ impl Display for TokenId {
             TokenId::Struct => "struct",
             TokenId::Pub => "pub",
             TokenId::Trait => "trait",
+            TokenId::Return => "return",
         })
     }
 }
@@ -198,6 +200,7 @@ pub enum Token {
     Struct,
     Pub,
     Trait,
+    Return,
 }
 impl Token {
     pub fn to_id(&self) -> TokenId {
@@ -249,6 +252,7 @@ impl Token {
             Token::Struct => TokenId::Struct,
             Token::Pub => TokenId::Pub,
             Token::Trait => TokenId::Trait,
+            Token::Return => TokenId::Return,
         }
     }
 }
