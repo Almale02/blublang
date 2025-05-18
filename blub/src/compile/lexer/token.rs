@@ -133,7 +133,7 @@ pub struct Number {
 impl Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_neg {
-            f.write_char('-');
+            let _ = f.write_char('-');
         }
         f.write_str(&self.whole_seg)
     }

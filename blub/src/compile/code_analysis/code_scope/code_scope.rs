@@ -928,7 +928,7 @@ impl CodeScope {
                             .get_scope_mut(new_scope_handle)
                             .var_name_to_expr
                             .insert(x.clone(), capture_expr_handle);
-                        if let Some(infer_handle) = parser.copy_type_or_infer_handle(
+                        if let Some(_) = parser.copy_type_or_infer_handle(
                             iter_expr_handle,
                             capture_expr_handle,
                             Box::new(|handle, reg| match reg.get_type_info(handle) {
@@ -1132,6 +1132,7 @@ impl CodeScopeParser {
             .unwrap()
             .remove(&base_expr);
     }
+    #[allow(unused_variables)]
     pub fn set_type_on_infer(
         &mut self,
         expr: CodeExprHandle,
