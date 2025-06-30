@@ -70,12 +70,16 @@ impl CodeScope {
         if let Some(expr) = self.var_name_to_expr.get(name) {
             return Some((*expr, self.handle));
         }
-        for parent_handle in parser.parent_map.get(&self.handle).unwrap().iter().copied() {
-            let parent = parser.get_scope_ref(parent_handle);
-            if let Some(expr) = parent.var_name_to_expr.get(name) {
+
+        let mut current_parent_handle = self.parent;
+        while let Some(parent_handle) = current_parent_handle {
+            let parent_scope = parser.get_scope_ref(parent_handle);
+            if let Some(expr) = parent_scope.var_name_to_expr.get(name) {
                 return Some((*expr, parent_handle));
             }
+            current_parent_handle = parent_scope.parent;
         }
+
         None
     }
     pub fn get_var_type(
@@ -431,7 +435,7 @@ impl CodeScope {
 
                 parser.expr_to_analysis.insert(
                     expr_handle,
-                    AnalysisExpr::Assignment {
+                    AnalysisExpr::Comparison {
                         lhs: left_expr_handle,
                         op,
                         rhs: right_expr_handle,
@@ -546,7 +550,7 @@ impl CodeScope {
 
                 parser.expr_to_analysis.insert(
                     expr_handle,
-                    AnalysisExpr::Assignment {
+                    AnalysisExpr::Range {
                         lhs: left_expr_handle,
                         op,
                         rhs: right_expr_handle,
@@ -779,7 +783,7 @@ impl CodeScope {
                             AnalysisExpr::ArrayInit {
                                 kind: ArrayInitAnalysisKind::DefaultValue {
                                     value: init_expr_handle,
-                                    count: init_expr_handle,
+                                    count: count_expr_handle,
                                 },
                                 expr,
                             },
@@ -812,6 +816,8 @@ impl CodeScope {
                                         got_type_on_expr = Some(item_expr_handle);
                                         got_infer_or_type =
                                             Some(TypeOrInferHandle::Type(type_handle));
+                                        let array_type = type_reg.get_or_add_type(TypeInfo::Array { handle: type_handle });
+                                        parser.expr_type_map.insert(expr, array_type);
                                     }
                                 },
                                 TypeOrInferHandle::Infer(expr_infer) => match got_infer_or_type {
@@ -1049,7 +1055,7 @@ impl CodeScope {
                     );
                 }
 
-                self.stmts.push(AnalysisStmt::ExprStmt {
+                self.stmts.push(AnalysisStmt::Return {
                     stmt,
                     expr: expr_handle,
                 });
@@ -1267,10 +1273,14 @@ impl CodeScopeParser {
         });
     }
     pub fn merge_infer_handles(&mut self, into: InferTypeHandle, from: InferTypeHandle) {
+        if into == from {
+            return;
+        }
         for expr in self.infer_expr_map.get(&from).cloned().unwrap() {
             self.infer_expr_map.get_mut(&into).unwrap().insert(expr);
             self.expr_infer_map.insert(expr, into);
         }
+        self.infer_expr_map.remove(&from);
     }
 
     pub fn add_infer_transformer(

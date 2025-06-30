@@ -131,6 +131,10 @@ pub enum AnalysisStmt {
         stmt: Stmt,
         expr: CodeExprHandle,
     },
+    Return {
+        stmt: Stmt,
+        expr: CodeExprHandle,
+    },
 }
 #[derive(Debug, Clone)]
 pub struct AnalysisStructField {
