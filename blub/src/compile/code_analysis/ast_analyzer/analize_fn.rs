@@ -1,7 +1,7 @@
 use crate::{
     blub_compile_error,
     compile::{
-        code_analysis::code_analyzer::AstAnalyzer,
+        code_analysis::code_analyzer::CodeAnalyzerData,
         types::type_registry::{TypeInfo, TypeRegistry},
     },
 };
@@ -9,13 +9,10 @@ use crate::{
 use super::get_decls::GetDecl;
 
 pub struct AnalyzeFunction;
-impl AstAnalyzer for AnalyzeFunction {
-    fn analize(
-        &mut self,
-        code_analyzer: &crate::compile::code_analysis::code_analyzer::CodeAnalyzer,
-    ) {
-        let type_reg = code_analyzer.data.get_mut::<TypeRegistry>();
-        for fn_stmt in &code_analyzer.data.get::<GetDecl>().fns {
+impl AnalyzeFunction {
+    pub fn analize(&mut self, code_analyzer: &CodeAnalyzerData) {
+        let type_reg = code_analyzer.get_mut::<TypeRegistry>();
+        for fn_stmt in &code_analyzer.get::<GetDecl>().fns {
             let (_is_extern, _is_pub, name, args, _body, ret_type) =
                 fn_stmt.clone().into_func_decl().unwrap();
             let type_info = TypeInfo::Fn {

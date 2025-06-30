@@ -1,15 +1,12 @@
-use crate::compile::{
-    code_analysis::code_analyzer::{AstAnalyzer, CodeAnalyzer},
-    parser::ast::Stmt,
-};
+use crate::compile::{code_analysis::code_analyzer::CodeAnalyzerData, parser::ast::Stmt};
 
 #[derive(Default)]
 pub struct GetAstBlock {
     pub blocks: Vec<Vec<Stmt>>,
 }
 
-impl AstAnalyzer for GetAstBlock {
-    fn analize(&mut self, code_analyzer: &CodeAnalyzer) {
+impl GetAstBlock {
+    pub fn analize(&mut self, code_analyzer: &CodeAnalyzerData) {
         self.blocks.push(code_analyzer.ast.to_vec());
         get_blocks(self, code_analyzer.ast);
     }

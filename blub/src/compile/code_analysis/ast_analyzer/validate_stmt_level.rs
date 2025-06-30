@@ -1,14 +1,11 @@
 use crate::{
     blub_compile_error,
-    compile::{code_analysis::code_analyzer::AstAnalyzer, parser::ast::Stmt},
+    compile::{code_analysis::code_analyzer::CodeAnalyzerData, parser::ast::Stmt},
 };
 
 pub struct ValidateStmtLevel;
-impl AstAnalyzer for ValidateStmtLevel {
-    fn analize(
-        &mut self,
-        code_analyzer: &crate::compile::code_analysis::code_analyzer::CodeAnalyzer,
-    ) {
+impl ValidateStmtLevel {
+    pub fn analize(&mut self, code_analyzer: &CodeAnalyzerData) {
         validate(code_analyzer.ast, true)
     }
 }

@@ -11,7 +11,7 @@ use compile::{
             analize_fn::AnalyzeFunction, analyze_ast_struct::AnalyzeAstStruct,
             get_ast_block::GetAstBlock, get_decls::GetDecl, validate_stmt_level::ValidateStmtLevel,
         },
-        code_analyzer::{AstAnalyzer, CodeAnalyzer, CodeAnalyzerData},
+        code_analyzer::CodeAnalyzerData,
         code_scope::code_scope::CodeScopeParser,
     },
     lexer::lexer::{Lexer, LexerHandlers},
@@ -45,7 +45,7 @@ fn main() {
                 //
                 //
                 //
-                let code_analyzer_data = CodeAnalyzerData::default();
+                let code_analyzer_data = CodeAnalyzerData::new(&ast);
                 code_analyzer_data.add_new(GetAstBlock::default());
                 code_analyzer_data.add_new(GetDecl::default());
                 code_analyzer_data.add_new(TypeRegistry::default());
@@ -58,21 +58,19 @@ fn main() {
                 let mut validate_stmt_level = ValidateStmtLevel;
                 let mut analyze_fn = AnalyzeFunction;
                 let mut analyze_struct = AnalyzeAstStruct;
+                validate_stmt_level.analize(&code_analyzer_data);
+                code_analyzer_data
+                    .get_mut::<GetAstBlock>()
+                    .analize(&code_analyzer_data);
+                code_analyzer_data
+                    .get_mut::<GetDecl>()
+                    .analize(&code_analyzer_data);
+                analyze_struct.analize(&code_analyzer_data);
+                analyze_fn.analize(&code_analyzer_data);
 
-                let mut ast_analyzers: Vec<&mut dyn AstAnalyzer> = vec![
-                    &mut validate_stmt_level,
-                    code_analyzer_data.get_mut::<GetAstBlock>(),
-                    code_analyzer_data.get_mut::<GetDecl>(),
-                    &mut analyze_struct,
-                    &mut analyze_fn,
-                ];
-                let mut code_analyzer = CodeAnalyzer::new(&ast, &code_analyzer_data);
-                code_analyzer.analyze(&mut ast_analyzers[..]);
-                //
-                //
                 let root_scope = code_scope_parser.new_root_scope();
 
-                root_scope.parse_code_block(ast, &code_analyzer_data);
+                root_scope.parse_code_block(ast.clone(), &code_analyzer_data);
                 println!("{}", "finished".bright_green());
                 exit(0);
             } else {

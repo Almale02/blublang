@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     blub_compile_error,
-    compile::{code_analysis::code_analyzer::AstAnalyzer, parser::ast::Stmt},
+    compile::{code_analysis::code_analyzer::CodeAnalyzerData, parser::ast::Stmt},
 };
 
 #[derive(Default)]
@@ -12,11 +12,8 @@ pub struct GetDecl {
     pub struct_map: HashMap<String, usize>,
 }
 
-impl AstAnalyzer for GetDecl {
-    fn analize(
-        &mut self,
-        code_analyzer: &crate::compile::code_analysis::code_analyzer::CodeAnalyzer,
-    ) {
+impl GetDecl {
+    pub fn analize(&mut self, code_analyzer: &CodeAnalyzerData) {
         for stmt in code_analyzer.ast {
             match stmt.clone() {
                 Stmt::FuncDecl { .. } => {

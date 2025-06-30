@@ -1,7 +1,7 @@
 use crate::{
     blub_compile_error,
     compile::{
-        code_analysis::code_analyzer::{AstAnalyzer, CodeAnalyzerData},
+        code_analysis::code_analyzer::CodeAnalyzerData,
         parser::ast::Stmt,
         types::type_registry::{
             StructField, TypeHandleResolveRes,
@@ -15,13 +15,10 @@ use super::get_decls::GetDecl;
 
 pub struct AnalyzeAstStruct;
 
-impl AstAnalyzer for AnalyzeAstStruct {
-    fn analize(
-        &mut self,
-        code_analyzer: &crate::compile::code_analysis::code_analyzer::CodeAnalyzer,
-    ) {
-        let decls = code_analyzer.data.get::<GetDecl>();
-        define_structs(decls.structs.clone(), code_analyzer.data);
+impl AnalyzeAstStruct {
+    pub fn analize(&mut self, code_analyzer: &CodeAnalyzerData) {
+        let decls = code_analyzer.get::<GetDecl>();
+        define_structs(decls.structs.clone(), code_analyzer);
     }
 }
 fn define_structs(struct_stmts: Vec<Stmt>, data: &CodeAnalyzerData) {
