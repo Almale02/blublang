@@ -3,11 +3,7 @@ use std::{
     fmt::Display,
 };
 
-use petgraph::{
-    Direction,
-    dot::{Config, Dot},
-    prelude::DiGraphMap,
-};
+use petgraph::{Direction, prelude::DiGraphMap};
 
 use crate::{
     blub_compile_error, blub_ice,
@@ -1138,7 +1134,6 @@ impl CodeScopeParser {
             .unwrap()
             .remove(&base_expr);
     }
-    #[allow(unused_variables)]
     pub fn set_type_on_infer(
         &mut self,
         expr: CodeExprHandle,
@@ -1148,42 +1143,62 @@ impl CodeScopeParser {
     ) {
         let type_reg = data.get_mut::<TypeRegistry>();
         let mut resolved_exprs = HashSet::new();
+
+        // Initial resolution wave based on the known type
         self.expr_map_recurse(expr, type_handle, data, infer_handle, &mut resolved_exprs);
-        let expr_debug_names = self.expr_debug_name.clone();
-
-        let handler = Box::new(move |graph, (from, to)| match expr_debug_names.get(&from) {
-            Some(x) => format!(r#"label = "{}""#, x),
-            None => format!(r#"label = "{}""#, from.0),
-        });
-
-        let dot = Dot::with_attr_getters(
-            &self.expr_graph,
-            &[Config::EdgeNoLabel, Config::NodeNoLabel],
-            &|graph, (from, to, _)| String::new(),
-            &*handler,
-        );
-        //println!("{}", dot);
 
         let mut iter_count = 0;
+        loop {
+            let mut resolved_in_pass = Vec::new();
 
-        while !self.infer_expr_map.get(&infer_handle).unwrap().is_empty() {
-            iter_count += 1;
-            for expr in self.infer_expr_map.get(&infer_handle).cloned().unwrap() {
-                for edge in self
+            // Check if there are any expressions left to infer for this handle
+            let expressions_to_infer = match self.infer_expr_map.get(&infer_handle) {
+                Some(exprs) => exprs.clone(),
+                None => break, // The inference set has been completely resolved
+            };
+
+            if expressions_to_infer.is_empty() {
+                break;
+            }
+
+            // Find expressions that can be resolved in this pass
+            for unresolved_expr in expressions_to_infer {
+                // An expression can be resolved if one of its dependencies is now resolved.
+                if let Some(resolved_dependency) = self
                     .expr_graph
-                    .neighbors_directed(expr, Direction::Outgoing)
+                    .neighbors_directed(unresolved_expr, Direction::Outgoing)
+                    .find(|dep| resolved_exprs.contains(dep))
                 {
-                    if resolved_exprs.contains(&edge) {
-                        resolved_exprs.insert(expr);
-                        let applyer = self.expr_infer_applyer_map.get(&expr).unwrap();
-                        let resolved_type = applyer(self.expr_to_type(edge), type_reg);
-                        self.set_type_on_infer(expr, infer_handle, resolved_type, data);
-                        break;
-                    }
+                    let applyer = self.expr_infer_applyer_map.get(&unresolved_expr).unwrap();
+                    let resolved_type = applyer(self.expr_to_type(resolved_dependency), type_reg);
+                    resolved_in_pass.push((unresolved_expr, resolved_type));
                 }
             }
+
+            // If no new expressions could be resolved in a full pass, we're done (or stuck).
+            if resolved_in_pass.is_empty() {
+                break;
+            }
+
+            // Apply the resolutions found in this pass
+            for (expr_to_resolve, new_type) in resolved_in_pass {
+                // Use expr_map_recurse to resolve this expression and its downstream dependencies.
+                // Check if it's not already resolved to avoid redundant work.
+                if !resolved_exprs.contains(&expr_to_resolve) {
+                    self.expr_map_recurse(
+                        expr_to_resolve,
+                        new_type,
+                        data,
+                        infer_handle,
+                        &mut resolved_exprs,
+                    );
+                }
+            }
+
+            iter_count += 1;
             if iter_count >= 300 {
-                blub_compile_error!("iter too long at applyer");
+                // This safety break prevents infinite loops in case of a logic error in the graph.
+                blub_compile_error!("type inference iteration limit reached");
             }
         }
     }
