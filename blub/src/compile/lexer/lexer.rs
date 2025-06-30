@@ -73,6 +73,8 @@ impl LexerHandlers {
             //
             default_handler("\\+", Token::Plus),
             default_handler("-", Token::Minus),
+            multi_line_comment_handler(),
+            comment_handler(),
             default_handler("/", Token::Div),
             default_handler("\\*", Token::Star),
             default_handler("%", Token::Percent),
@@ -83,6 +85,38 @@ impl LexerHandlers {
             number_handler(),
         ];
     }
+}
+
+fn multi_line_comment_handler() -> LexerHandler {
+    Box::new(|lexer| {
+        let res = match Regex::new(r"/\*(?s)(.*?)\*/").unwrap().find(lexer.rem_code) {
+            Some(x) => x,
+            None => return false,
+        };
+
+        if res.start() != 0 {
+            return false;
+        }
+        lexer.set_head(lexer.head + res.end());
+        lexer.handle_whitespace();
+        true
+    })
+}
+
+fn comment_handler() -> LexerHandler {
+    Box::new(|lexer| {
+        let res = match Regex::new(r"//.*").unwrap().find(lexer.rem_code) {
+            Some(x) => x,
+            None => return false,
+        };
+
+        if res.start() != 0 {
+            return false;
+        }
+        lexer.set_head(lexer.head + res.end());
+        lexer.handle_whitespace();
+        true
+    })
 }
 
 impl Default for LexerHandlers {
@@ -119,7 +153,7 @@ impl<'a> Lexer<'a> {
             .expect("expected whitespace after a token");
         self.set_head(self.head + res.end());
     }
-    pub fn step(&mut self) -> Token {
+    pub fn step(&mut self) {
         let mut handled = false;
         for handler in self.handlers.handlers.iter() {
             if handler(self) {
@@ -134,13 +168,15 @@ impl<'a> Lexer<'a> {
                 self.rem_code
             );
         }
-        self.tokens.last().unwrap().clone()
     }
     pub fn tokenize(&mut self) {
         self.tokens = Vec::new();
         self.head = 0;
         self.rem_code = self.code;
-        while self.step() != Token::Eof {}
+        while !self.rem_code.is_empty() {
+            self.step()
+        }
+        self.tokens.push(Token::Eof);
     }
 }
 type LexerHandler = Box<dyn Fn(&mut Lexer) -> bool>;
