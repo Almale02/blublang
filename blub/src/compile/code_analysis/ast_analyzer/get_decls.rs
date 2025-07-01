@@ -8,6 +8,7 @@ use crate::{
 #[derive(Default)]
 pub struct GetDecl {
     pub fns: Vec<Stmt>,
+    pub fn_map: HashMap<String, usize>,
     pub structs: Vec<Stmt>,
     pub struct_map: HashMap<String, usize>,
 }
@@ -16,8 +17,9 @@ impl GetDecl {
     pub fn analize(&mut self, code_analyzer: &CodeAnalyzerData) {
         for stmt in code_analyzer.ast {
             match stmt.clone() {
-                Stmt::FuncDecl { .. } => {
+                Stmt::FuncDecl { name, .. } => {
                     self.fns.push(stmt.clone());
+                    self.fn_map.insert(name, self.fns.len() - 1);
                 }
                 Stmt::StructDecl { name, .. } => {
                     if self.struct_map.contains_key(&name) {

@@ -30,6 +30,12 @@ impl Display for CodeExprHandle {
 #[repr(transparent)]
 pub struct CodeSubExprHandle(pub u64);
 
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct AnalysisStmtHandle {
+    pub scope: CodeScopeHandle,
+    pub idx: usize,
+}
+
 pub struct CodeScope {
     pub handle: CodeScopeHandle,
     pub parent: Option<CodeScopeHandle>,
@@ -998,6 +1004,9 @@ impl CodeScope {
                 name, args, body, ..
             } => {
                 let new_scope_handle = parser.new_scope(Some(self.handle), Some(name.clone()));
+                parser
+                    .fn_name_to_code_scope
+                    .insert(name.clone(), new_scope_handle);
                 let fn_type_handle = type_reg.fn_name_to_handle.get(&name).cloned().unwrap();
                 let fn_info = type_reg.get_type_info(fn_type_handle);
                 let (_, type_fn_args) = fn_info.clone().into_fn().unwrap();
@@ -1081,7 +1090,7 @@ impl CodeScope {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct CodeScopeHandle(pub u64);
 
@@ -1094,6 +1103,7 @@ pub type ExprGraph = DiGraphMap<CodeExprHandle, u8>;
 
 #[allow(clippy::type_complexity)]
 pub struct CodeScopeParser {
+    pub fn_name_to_code_scope: HashMap<String, CodeScopeHandle>,
     pub next_expr_handle: u64,
     pub next_sub_expr_handle: u64,
     pub next_scope_handle: u64,
@@ -1124,6 +1134,9 @@ pub struct CodeScopeParser {
 }
 #[allow(clippy::type_complexity)]
 impl CodeScopeParser {
+    pub fn get_stmt_by_handle(&self, handle: AnalysisStmtHandle) -> &AnalysisStmt {
+        &self.get_scope_ref(handle.scope).stmts[handle.idx]
+    }
     fn expr_map_recurse(
         &mut self,
         base_expr: CodeExprHandle,
@@ -1317,7 +1330,7 @@ impl CodeScopeParser {
             self.infer_expr_map.get_mut(&into).unwrap().insert(expr);
             self.expr_infer_map.insert(expr, into);
         }
-        self.infer_expr_map.remove(&from);
+        //self.infer_expr_map.remove(&from);
     }
 
     pub fn add_infer_transformer(
@@ -1466,6 +1479,7 @@ impl Default for CodeScopeParser {
             expr_debug_name: Default::default(),
             parent_map: Default::default(),
             scopes: Default::default(),
+            fn_name_to_code_scope: Default::default(),
         }
     }
 }

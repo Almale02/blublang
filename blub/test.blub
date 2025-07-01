@@ -1,8 +1,8 @@
 fn main() {
 	let first_item = 32;
-	print_u32(first_item);
 	let array = [first_item, 1,2,3];
-	/*print_u32_arr(array);*/
+	print_u32_arr(array);
+	print_u32(first_item);
 }
 fn print_u32(x: u32): u8 {
 	let a = 2;
