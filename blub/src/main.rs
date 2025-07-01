@@ -21,6 +21,48 @@ use compile::{
 
 pub mod compile;
 
+fn build(code: String) {
+    let mut lexer_handlers = LexerHandlers::new();
+    lexer_handlers.set_handlers();
+    let mut lexer = Lexer::new(&code, &lexer_handlers);
+    lexer.tokenize();
+    //
+    let mut parser_handlers = ParserHandlers::default();
+    parser_handlers.create_lookups();
+
+    let mut parser = Parser::new(&parser_handlers, &lexer.tokens);
+    parser.setup();
+    let ast = parser.parse();
+    //
+    //
+    let code_analyzer_data = Box::leak(Box::new(CodeAnalyzerData::new(&ast)));
+    code_analyzer_data.add_new(GetAstBlock::default());
+    code_analyzer_data.add_new(GetDecl::default());
+    code_analyzer_data.add_new(TypeRegistry::default());
+    code_analyzer_data.add_new(CodeScopeParser::default());
+    //
+    let type_reg = code_analyzer_data.get_mut::<TypeRegistry>();
+    type_reg.add_primitives();
+    let code_scope_parser = code_analyzer_data.get_mut::<CodeScopeParser>();
+    //
+    let mut validate_stmt_level = ValidateStmtLevel;
+    let mut analyze_fn = AnalyzeFunction;
+    let mut analyze_struct = AnalyzeAstStruct;
+    validate_stmt_level.analize(&code_analyzer_data);
+    code_analyzer_data
+        .get_mut::<GetAstBlock>()
+        .analize(&code_analyzer_data);
+    code_analyzer_data
+        .get_mut::<GetDecl>()
+        .analize(&code_analyzer_data);
+    analyze_struct.analize(&code_analyzer_data);
+    analyze_fn.analize(&code_analyzer_data);
+
+    let root_scope = code_scope_parser.new_root_scope();
+
+    root_scope.parse_code_block(ast.clone(), &code_analyzer_data);
+}
+
 fn main() {
     match args().collect::<Vec<_>>()[1].as_str() {
         "build" => {
@@ -30,47 +72,8 @@ fn main() {
                     blub_tui_error!("file {:?} doesnt exists", path.to_str().unwrap());
                 }
                 let code = read_to_string(path).unwrap();
+                build(code);
                 //
-                let mut lexer_handlers = LexerHandlers::new();
-                lexer_handlers.set_handlers();
-                let mut lexer = Lexer::new(&code, &lexer_handlers);
-                lexer.tokenize();
-                //
-                let mut parser_handlers = ParserHandlers::default();
-                parser_handlers.create_lookups();
-
-                let mut parser = Parser::new(&parser_handlers, &lexer.tokens);
-                parser.setup();
-                let ast = parser.parse();
-                //
-                //
-                //
-                let code_analyzer_data = CodeAnalyzerData::new(&ast);
-                code_analyzer_data.add_new(GetAstBlock::default());
-                code_analyzer_data.add_new(GetDecl::default());
-                code_analyzer_data.add_new(TypeRegistry::default());
-                code_analyzer_data.add_new(CodeScopeParser::default());
-                //
-                let type_reg = code_analyzer_data.get_mut::<TypeRegistry>();
-                type_reg.add_primitives();
-                let code_scope_parser = code_analyzer_data.get_mut::<CodeScopeParser>();
-                //
-                let mut validate_stmt_level = ValidateStmtLevel;
-                let mut analyze_fn = AnalyzeFunction;
-                let mut analyze_struct = AnalyzeAstStruct;
-                validate_stmt_level.analize(&code_analyzer_data);
-                code_analyzer_data
-                    .get_mut::<GetAstBlock>()
-                    .analize(&code_analyzer_data);
-                code_analyzer_data
-                    .get_mut::<GetDecl>()
-                    .analize(&code_analyzer_data);
-                analyze_struct.analize(&code_analyzer_data);
-                analyze_fn.analize(&code_analyzer_data);
-
-                let root_scope = code_scope_parser.new_root_scope();
-
-                root_scope.parse_code_block(ast.clone(), &code_analyzer_data);
                 println!("{}", "finished".bright_green());
                 exit(0);
             } else {

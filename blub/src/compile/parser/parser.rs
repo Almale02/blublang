@@ -53,7 +53,6 @@ impl ParserHandlers {
 
         self.led(TokenId::And, BindingPower::Logical, Box::new(|parser, expr, bp| Parser::parse_arithmetic_expr(parser, expr, bp)));
         self.led(TokenId::Or, BindingPower::Logical, Box::new(|parser, expr, bp| Parser::parse_arithmetic_expr(parser, expr, bp)) );
-        self.led(TokenId::Not, BindingPower::Logical, Box::new(|parser, expr, bp| Parser::parse_arithmetic_expr(parser, expr, bp)) );
         //
         self.led(TokenId::Less, BindingPower::Relational, Box::new(|parser, expr, bp| Parser::parse_comparison_expr(parser, expr, bp)) );
         self.led(TokenId::LessEq, BindingPower::Relational, Box::new(|parser, expr, bp| Parser::parse_comparison_expr(parser, expr, bp)) );
@@ -91,6 +90,7 @@ impl ParserHandlers {
         self.stmt(TokenId::Fn, Box::new(|x| Parser::parse_fn_decl_stmt(x)));
         //
         //
+        self.nud(TokenId::Not, Box::new(|x| Parser::parse_prefix_expr(x)));
         self.nud(TokenId::And, Box::new(|x| Parser::parse_ref_expr(x)));
         self.nud(TokenId::Number, Box::new(|x| Parser::parse_literal_expr(x)));
         self.nud(TokenId::String, Box::new(|x| Parser::parse_literal_expr(x)));

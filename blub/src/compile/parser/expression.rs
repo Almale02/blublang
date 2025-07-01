@@ -87,6 +87,14 @@ impl Parser<'_> {
             _ => blub_ice!("token {} is not a literal", token),
         }
     }
+    pub fn parse_prefix_expr(&mut self) -> ParseExprRes {
+        let op = self.advance();
+        let right = self.parse_expr(BindingPower::Unary);
+        Expr::Unary {
+            op,
+            right: Box::new(right),
+        }
+    }
     pub fn parse_ident(&mut self) -> ParseExprRes {
         Expr::Ident(self.advance_expect(TokenId::Ident).into_ident().unwrap())
     }

@@ -55,6 +55,10 @@ pub enum Expr {
     ArrayInit {
         kind: ArrayInitExprKind,
     },
+    Unary {
+        op: Token,
+        right: Box<Expr>,
+    },
 }
 #[derive(Clone, Debug, EnumAsInner)]
 pub enum ArrayInitExprKind {
@@ -78,6 +82,7 @@ impl Expr {
             Expr::Comparison { .. } => ExprId::Comparison,
             Expr::Arithmetic { .. } => ExprId::Arithmetic,
             Expr::Range { .. } => ExprId::Range,
+            Expr::Unary { .. } => ExprId::Unary,
         }
     }
     pub fn is(&self, id: ExprId) -> bool {
@@ -100,6 +105,7 @@ pub enum ExprId {
     Access,
     Group,
     ArrayInit,
+    Unary,
 }
 impl Display for ExprId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -118,6 +124,7 @@ impl Display for ExprId {
             ExprId::Comparison => "comparison expr",
             ExprId::Arithmetic => "arithmetic expr",
             ExprId::Range => "range expr",
+            ExprId::Unary => "unary expr",
         })
     }
 }
