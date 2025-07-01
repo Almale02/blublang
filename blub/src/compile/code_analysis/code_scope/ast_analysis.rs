@@ -90,6 +90,11 @@ pub enum AnalysisExpr {
         kind: ArrayInitAnalysisKind,
         expr: CodeExprHandle,
     },
+    Unary {
+        op: Token,
+        rhs: CodeExprHandle,
+        expr: CodeExprHandle,
+    },
 }
 #[derive(Debug, Clone, EnumAsInner)]
 pub enum ArrayInitAnalysisKind {

@@ -864,6 +864,28 @@ impl CodeScope {
                 };
                 expr
             }
+            Expr::Unary { op, right } => {
+                let right_expr_handle = self.parse_ast_expr(*right, data);
+                let expr_handle = parser.new_expr(self.handle);
+
+                parser.copy_type_or_infer_handle(
+                    right_expr_handle,
+                    expr_handle,
+                    Box::new(|handle, _| handle),
+                    data,
+                );
+
+                parser.expr_to_analysis.insert(
+                    expr_handle,
+                    AnalysisExpr::Unary {
+                        op,
+                        rhs: right_expr_handle,
+                        expr: expr_handle,
+                    },
+                );
+
+                expr_handle
+            }
         }
     }
     pub fn parse_ast_stmt(&mut self, stmt: Stmt, data: &CodeAnalyzerData) {
