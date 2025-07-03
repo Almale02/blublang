@@ -20,16 +20,25 @@ impl ControlFlowGraphs {
         analyzer_data: &mut CodeAnalyzerData,
         fn_name: String,
     ) {
-        let graph = ControlFlowGraph::default();
+        let mut graph = ControlFlowGraph::default();
         let code_scope_parser = analyzer_data.get::<CodeScopeParser>();
-        let fn_body = &code_scope_parser
-            .get_scope_ref(
-                *code_scope_parser
-                    .fn_name_to_code_scope
-                    .get(&fn_name)
-                    .unwrap(),
-            )
-            .stmts;
+        let fn_scope = code_scope_parser
+            .fn_name_to_code_scope
+            .get(&fn_name)
+            .unwrap();
+        let fn_body = &code_scope_parser.get_scope_ref(*fn_scope).stmts;
+        if !fn_body.is_empty() {
+            self.analyze_stmt(
+                fn_body,
+                AnalysisStmtHandle {
+                    scope: *fn_scope,
+                    idx: 0,
+                },
+                None,
+                code_scope_parser,
+                &mut graph,
+            );
+        }
     }
     fn analyze_stmt(
         &mut self,
@@ -41,24 +50,33 @@ impl ControlFlowGraphs {
     ) {
         let current_stmt = &stmts[current_handle.idx];
         match current_stmt {
-            AnalysisStmt::FunctionDecl {
-                stmt,
-                fn_info,
-                scope,
-            } => unreachable!(),
-            AnalysisStmt::StructDecl { stmt, fields } => unreachable!(),
+            AnalysisStmt::FunctionDecl { .. } => unreachable!(),
+            AnalysisStmt::StructDecl { .. } => unreachable!(),
             AnalysisStmt::If { stmt, scope, guard } => todo!(),
             AnalysisStmt::For {
                 stmt,
                 scope,
                 captures,
                 iter_value,
-            } => todo!(),
-            AnalysisStmt::Return { stmt, expr } => todo!(),
-            AnalysisStmt::VarDecl { stmt, .. } | AnalysisStmt::ExprStmt { stmt, .. } => {
+            } => {}
+            AnalysisStmt::VarDecl { .. }
+            | AnalysisStmt::ExprStmt { .. }
+            | AnalysisStmt::Return { .. } => {
                 graph.add_node(current_handle);
                 if let Some(prev) = prev_handle {
                     graph.add_edge(prev, current_handle, ());
+                }
+                if let Some(_) = stmts.get(current_handle.idx + 1) {
+                    self.analyze_stmt(
+                        stmts,
+                        AnalysisStmtHandle {
+                            scope: current_handle.scope,
+                            idx: current_handle.idx + 1,
+                        },
+                        Some(current_handle),
+                        code_scope_parser,
+                        graph,
+                    );
                 }
             }
         }
