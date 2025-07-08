@@ -34,61 +34,52 @@ impl ControlFlowGraphs {
                     scope: *fn_scope,
                     idx: 0,
                 },
-                None,
+                vec![],
                 code_scope_parser,
                 &mut graph,
             );
         }
     }
-    /// _Returns:_ last stmt in a scope
+    /// _Returns:_ the statements which has a direct path to the next statement in the upper scope
+    /// so for non conditional statements the last stmt in the scope
+    /// and for if statements, the statement, and the last stmt conns in each code path
     fn analyze_stmt(
         &mut self,
         stmts: &[AnalysisStmt],
         current_handle: AnalysisStmtHandle,
-        prev_handle: Option<AnalysisStmtHandle>,
+        prev_conns: Vec<AnalysisStmtHandle>,
         code_scope_parser: &CodeScopeParser,
         graph: &mut ControlFlowGraph,
-    ) -> AnalysisStmtHandle {
+    ) -> Vec<AnalysisStmtHandle> {
         let current_stmt = &stmts[current_handle.idx];
         match current_stmt {
             AnalysisStmt::FunctionDecl { .. } => unreachable!(),
             AnalysisStmt::StructDecl { .. } => unreachable!(),
-            AnalysisStmt::If { stmt, scope, guard } => {
+            AnalysisStmt::If { scope, .. } => {
                 graph.add_node(current_handle);
                 let body = &code_scope_parser.get_scope_ref(*scope).stmts;
-                let mut last_in_body = if !body.is_empty() {
+                let last_conns_in_body = if !body.is_empty() {
                     Some(self.analyze_stmt(
                         body,
                         AnalysisStmtHandle {
                             scope: *scope,
                             idx: 0,
                         },
-                        None,
+                        vec![current_handle],
                         code_scope_parser,
                         graph,
                     ))
                 } else {
                     None
                 };
-                if let Some(prev) = prev_handle {
-                    graph.add_edge(prev, current_handle, ());
+                prev_conns.iter().for_each(|prev| {
+                    graph.add_edge(*prev, current_handle, ());
+                });
+                let mut conns_to_next = vec![];
+                if let Some(lasts) = last_conns_in_body {
+                    conns_to_next.extend_from_slice(&lasts);
                 }
-            }
-            AnalysisStmt::For {
-                stmt,
-                scope,
-                captures,
-                iter_value,
-            } => {
-                todo!()
-            }
-            AnalysisStmt::VarDecl { .. }
-            | AnalysisStmt::ExprStmt { .. }
-            | AnalysisStmt::Return { .. } => {
-                graph.add_node(current_handle);
-                if let Some(prev) = prev_handle {
-                    graph.add_edge(prev, current_handle, ());
-                }
+                conns_to_next.push(current_handle);
                 if let Some(_) = stmts.get(current_handle.idx + 1) {
                     return self.analyze_stmt(
                         stmts,
@@ -96,12 +87,71 @@ impl ControlFlowGraphs {
                             scope: current_handle.scope,
                             idx: current_handle.idx + 1,
                         },
-                        Some(current_handle),
+                        conns_to_next.clone(),
+                        code_scope_parser,
+                        graph,
+                    );
+                }
+                return conns_to_next;
+            }
+            AnalysisStmt::For { scope, .. } => {
+                graph.add_node(current_handle);
+                prev_conns.iter().for_each(|prev| {
+                    graph.add_edge(*prev, current_handle, ());
+                });
+                let body = &code_scope_parser.get_scope_ref(*scope).stmts;
+                let last_conns_in_body = if !body.is_empty() {
+                    Some(self.analyze_stmt(
+                        body,
+                        AnalysisStmtHandle {
+                            scope: *scope,
+                            idx: 0,
+                        },
+                        vec![current_handle],
+                        code_scope_parser,
+                        graph,
+                    ))
+                } else {
+                    None
+                };
+                let conns_to_next = match last_conns_in_body {
+                    Some(x) => x,
+                    None => vec![current_handle],
+                };
+                if let Some(_) = stmts.get(current_handle.idx + 1) {
+                    return self.analyze_stmt(
+                        stmts,
+                        AnalysisStmtHandle {
+                            scope: current_handle.scope,
+                            idx: current_handle.idx + 1,
+                        },
+                        conns_to_next.clone(),
+                        code_scope_parser,
+                        graph,
+                    );
+                }
+                return conns_to_next;
+            }
+            AnalysisStmt::VarDecl { .. }
+            | AnalysisStmt::ExprStmt { .. }
+            | AnalysisStmt::Return { .. } => {
+                graph.add_node(current_handle);
+                prev_conns.iter().for_each(|prev| {
+                    graph.add_edge(*prev, current_handle, ());
+                });
+                if let Some(_) = stmts.get(current_handle.idx + 1) {
+                    return self.analyze_stmt(
+                        stmts,
+                        AnalysisStmtHandle {
+                            scope: current_handle.scope,
+                            idx: current_handle.idx + 1,
+                        },
+                        vec![current_handle],
                         code_scope_parser,
                         graph,
                     );
                 } else {
-                    return current_handle;
+                    return vec![current_handle];
                 }
             }
         }
