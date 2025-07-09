@@ -114,10 +114,11 @@ impl ControlFlowGraphs {
                 } else {
                     None
                 };
-                let conns_to_next = match last_conns_in_body {
-                    Some(x) => x,
-                    None => vec![current_handle],
-                };
+                let mut conns_to_next = vec![];
+                if let Some(lasts) = last_conns_in_body {
+                    conns_to_next.extend_from_slice(&lasts);
+                }
+                conns_to_next.push(current_handle);
                 if let Some(_) = stmts.get(current_handle.idx + 1) {
                     return self.analyze_stmt(
                         stmts,

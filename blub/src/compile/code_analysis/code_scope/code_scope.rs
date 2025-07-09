@@ -35,6 +35,11 @@ pub struct AnalysisStmtHandle {
     pub scope: CodeScopeHandle,
     pub idx: usize,
 }
+impl AnalysisStmtHandle {
+    pub fn is_valid(&self) -> bool {
+        self.scope.0 != 0
+    }
+}
 
 pub struct CodeScope {
     pub handle: CodeScopeHandle,
