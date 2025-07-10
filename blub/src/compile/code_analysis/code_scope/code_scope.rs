@@ -39,6 +39,10 @@ impl AnalysisStmtHandle {
     pub fn is_valid(&self) -> bool {
         self.scope.0 != 0
     }
+    pub const INVALID: AnalysisStmtHandle = AnalysisStmtHandle {
+        scope: CodeScopeHandle::INVALID,
+        idx: 0,
+    };
 }
 
 pub struct CodeScope {
@@ -1098,6 +1102,9 @@ impl CodeScope {
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct CodeScopeHandle(pub u64);
+impl CodeScopeHandle {
+    pub const INVALID: CodeScopeHandle = CodeScopeHandle(0);
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]

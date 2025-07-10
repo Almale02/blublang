@@ -28,7 +28,8 @@ impl ControlFlowGraphs {
             .unwrap();
         let fn_body = &code_scope_parser.get_scope_ref(*fn_scope).stmts;
         if !fn_body.is_empty() {
-            self.analyze_stmt(
+            let end_node = AnalysisStmtHandle::INVALID;
+            let last_conns = self.analyze_stmt(
                 fn_body,
                 AnalysisStmtHandle {
                     scope: *fn_scope,
@@ -38,7 +39,17 @@ impl ControlFlowGraphs {
                 code_scope_parser,
                 &mut graph,
             );
+            graph.add_node(end_node);
+            last_conns.iter().for_each(|prev| {
+                graph.add_edge(*prev, end_node, ());
+            });
         }
+        self.graph_fn_map.insert(fn_name, graph);
+    }
+    pub fn check_all_paths_return(&mut self, fn_name: &String) -> bool {
+        let graph = self.graph_fn_map.get(fn_name).unwrap();
+
+        todo!()
     }
     /// _Returns:_ the statements which has a direct path to the next statement in the upper scope
     /// so for non conditional statements the last stmt in the scope
@@ -133,9 +144,7 @@ impl ControlFlowGraphs {
                 }
                 return conns_to_next;
             }
-            AnalysisStmt::VarDecl { .. }
-            | AnalysisStmt::ExprStmt { .. }
-            | AnalysisStmt::Return { .. } => {
+            AnalysisStmt::VarDecl { .. } | AnalysisStmt::ExprStmt { .. } => {
                 graph.add_node(current_handle);
                 prev_conns.iter().for_each(|prev| {
                     graph.add_edge(*prev, current_handle, ());
@@ -154,6 +163,13 @@ impl ControlFlowGraphs {
                 } else {
                     return vec![current_handle];
                 }
+            }
+            AnalysisStmt::Return { .. } => {
+                graph.add_node(current_handle);
+                prev_conns.iter().for_each(|prev| {
+                    graph.add_edge(*prev, current_handle, ());
+                });
+                return vec![current_handle];
             }
         }
     }
