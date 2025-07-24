@@ -128,6 +128,17 @@ impl Display for ExprId {
         })
     }
 }
+#[derive(Clone, Debug)]
+pub struct IfStmtGuardCase {
+    pub guard: Expr,
+    pub body: Vec<Stmt>,
+}
+
+impl IfStmtGuardCase {
+    pub fn new(guard: Expr, body: Vec<Stmt>) -> Self {
+        Self { guard, body }
+    }
+}
 #[derive(Clone, Debug, EnumAsInner)]
 pub enum Stmt {
     VarDecl {
@@ -136,8 +147,9 @@ pub enum Stmt {
         init_value: Option<Expr>,
     },
     If {
-        guard: Expr,
-        body: Vec<Stmt>,
+        base_case: IfStmtGuardCase,
+        elif_cases: Vec<IfStmtGuardCase>,
+        else_body: Option<Vec<Stmt>>,
     },
     For {
         capture: Expr,
@@ -159,7 +171,7 @@ pub enum Stmt {
         fields: Vec<AstStructField>,
     },
     ExprStmt(Expr),
-    Retrun(Expr),
+    Retrun(Option<Expr>),
 }
 impl Stmt {
     pub fn to_id(&self) -> StmtId {

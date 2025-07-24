@@ -2,7 +2,7 @@ use crate::{
     blub_compile_error, blub_ice,
     compile::{
         lexer::token::{Token, TokenId},
-        parser::ast::ArgsDecl,
+        parser::ast::{ArgsDecl, IfStmtGuardCase},
     },
 };
 
@@ -94,6 +94,16 @@ impl Parser<'_> {
             body,
         }
     }
+    /*
+    if guard {
+
+    } else if guard_2 {
+
+    } else {
+
+    }
+
+    */
     pub fn parse_if_stmt(&mut self) -> Stmt {
         self.advance();
         let has_iter_grouping = self.advance_expect_null(TokenId::OpenParen).is_some();
@@ -101,17 +111,52 @@ impl Parser<'_> {
             self.backtrack();
             self.expr_breakers.insert(TokenId::OpenBlock);
         }
-        let guard = self.parse_expr(BindingPower::Default);
+        let base_guard = self.parse_expr(BindingPower::Default);
         if has_iter_grouping {
             self.advance_expect(TokenId::CloseParen);
         } else {
             self.expr_breakers.remove(&TokenId::OpenBlock);
         }
         self.advance_expect(TokenId::OpenBlock);
-        let body = self.parse_block();
+        let base_body = self.parse_block();
         self.advance_expect(TokenId::CloseBlock);
 
-        Stmt::If { guard, body }
+        let mut elif_cases = Vec::new();
+        let mut else_body = None;
+
+        while self.curr_token().to_id() == TokenId::Else {
+            self.advance();
+            if self.curr_token().to_id() == TokenId::If {
+                self.advance();
+                let has_iter_grouping = self.advance_expect_null(TokenId::OpenParen).is_some();
+                if !has_iter_grouping {
+                    self.backtrack();
+                    self.expr_breakers.insert(TokenId::OpenBlock);
+                }
+                let elif_guard = self.parse_expr(BindingPower::Default);
+                if has_iter_grouping {
+                    self.advance_expect(TokenId::CloseParen);
+                } else {
+                    self.expr_breakers.remove(&TokenId::OpenBlock);
+                }
+                self.advance_expect(TokenId::OpenBlock);
+                let elif_body = self.parse_block();
+                self.advance_expect(TokenId::CloseBlock);
+
+                elif_cases.push(IfStmtGuardCase::new(elif_guard, elif_body));
+            } else {
+                self.advance_expect(TokenId::OpenBlock);
+                else_body = Some(self.parse_block());
+                self.advance_expect(TokenId::CloseBlock);
+                break;
+            }
+        }
+
+        Stmt::If {
+            base_case: IfStmtGuardCase::new(base_guard, base_body),
+            elif_cases,
+            else_body,
+        }
     }
     pub fn parse_struct_decl_stmt(&mut self) -> Stmt {
         let is_pub = if let Some(prev) = self.look_back() {
@@ -233,10 +278,15 @@ impl Parser<'_> {
     }
     pub fn parse_return_stmt(&mut self) -> ParseStmtRes {
         self.advance();
+
+        if self.curr_token().to_id() == TokenId::SemiColon {
+            self.advance();
+            return Stmt::Retrun(None);
+        }
         let expr = self.parse_expr(BindingPower::Default);
         self.advance_expect(TokenId::SemiColon);
 
-        return Stmt::Retrun(expr);
+        return Stmt::Retrun(Some(expr));
     }
 }
 /*

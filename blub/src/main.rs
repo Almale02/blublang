@@ -19,6 +19,8 @@ use compile::{
     types::type_registry::TypeRegistry,
 };
 
+use crate::compile::code_analysis::get_control_flow_graph::ControlFlowGraphs;
+
 pub mod compile;
 
 fn build(code: String) {
@@ -40,6 +42,7 @@ fn build(code: String) {
     code_analyzer_data.add_new(GetDecl::default());
     code_analyzer_data.add_new(TypeRegistry::default());
     code_analyzer_data.add_new(CodeScopeParser::default());
+    code_analyzer_data.add_new(ControlFlowGraphs::default());
     //
     let type_reg = code_analyzer_data.get_mut::<TypeRegistry>();
     type_reg.add_primitives();
@@ -61,6 +64,9 @@ fn build(code: String) {
     let root_scope = code_scope_parser.new_root_scope();
 
     root_scope.parse_code_block(ast.clone(), &code_analyzer_data);
+    let control_flow_graph = code_analyzer_data.get_mut::<ControlFlowGraphs>();
+    control_flow_graph.create_control_flow_graphs(code_scope_parser);
+    control_flow_graph.check_functions_return_correctly(code_scope_parser, type_reg);
 }
 
 fn main() {
@@ -94,6 +100,18 @@ macro_rules! blub_compile_error {
         use std::backtrace::Backtrace;
         let msg = format!($($arg)*);
         println!("{}{}", "compile error: ".red(), msg.on_bright_red().bold());
+        println!("{}", Backtrace::capture());
+        std::process::exit(-1);
+
+    }};
+}
+#[macro_export]
+macro_rules! blub_compile_error_debug {
+    ($($arg:tt)*) => {{
+        use colored::Colorize;
+        use std::backtrace::Backtrace;
+        let msg = format!($($arg)*);
+        dbg!("{}{}", "compile error: ".red(), msg.on_bright_red().bold());
         println!("{}", Backtrace::capture());
         std::process::exit(-1);
 

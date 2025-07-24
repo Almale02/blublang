@@ -191,8 +191,20 @@ impl<'a> Parser<'a> {
         }
         Some(self.tokens[self.head - 1].clone())
     }
+    pub fn look_ahead(&self) -> Option<Token> {
+        if self.tokens.len() - 1 == self.head {
+            return None;
+        }
+        Some(self.tokens[self.head + 1].clone())
+    }
     pub fn is_prev(&self, id: TokenId) -> bool {
         if let Some(token) = self.look_back() {
+            return token.to_id() == id;
+        }
+        false
+    }
+    pub fn is_next(&self, id: TokenId) -> bool {
+        if let Some(token) = self.look_ahead() {
             return token.to_id() == id;
         }
         false

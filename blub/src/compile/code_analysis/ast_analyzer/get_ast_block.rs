@@ -14,9 +14,21 @@ impl GetAstBlock {
 pub fn get_blocks(blocks: &mut GetAstBlock, stmts: &[Stmt]) {
     for stmt in stmts {
         match stmt {
-            Stmt::If { body, .. } => {
-                blocks.blocks.push(body.clone());
-                get_blocks(blocks, body)
+            Stmt::If {
+                base_case,
+                elif_cases,
+                else_body,
+            } => {
+                blocks.blocks.push(base_case.body.clone());
+                get_blocks(blocks, &base_case.body);
+                elif_cases.iter().for_each(|x| {
+                    blocks.blocks.push(x.body.clone());
+                    get_blocks(blocks, &x.body);
+                });
+                if let Some(else_body) = else_body {
+                    blocks.blocks.push(else_body.clone());
+                    get_blocks(blocks, &else_body);
+                }
             }
             Stmt::For { body, .. } => {
                 blocks.blocks.push(body.clone());

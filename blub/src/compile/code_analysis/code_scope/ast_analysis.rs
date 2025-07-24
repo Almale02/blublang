@@ -106,6 +106,17 @@ pub enum ArrayInitAnalysisKind {
         items: Vec<CodeExprHandle>,
     },
 }
+#[derive(Clone, Debug)]
+pub struct IfAnalysisGuardCase {
+    pub guard: CodeExprHandle,
+    pub scope: CodeScopeHandle,
+}
+
+impl IfAnalysisGuardCase {
+    pub fn new(guard: CodeExprHandle, scope: CodeScopeHandle) -> Self {
+        Self { guard, scope }
+    }
+}
 #[derive(Debug, Clone, EnumAsInner)]
 pub enum AnalysisStmt {
     VarDecl {
@@ -113,9 +124,9 @@ pub enum AnalysisStmt {
         init_value: CodeExprHandle,
     },
     If {
-        stmt: Stmt,
-        scope: CodeScopeHandle,
-        guard: CodeExprHandle,
+        base_case: IfAnalysisGuardCase,
+        elif_cases: Vec<IfAnalysisGuardCase>,
+        else_case: Option<CodeScopeHandle>,
     },
     For {
         stmt: Stmt,

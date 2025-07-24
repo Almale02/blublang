@@ -20,7 +20,19 @@ fn validate(block: &[Stmt], is_top_level: bool) {
         }
         match stmt {
             Stmt::VarDecl { .. } => (),
-            Stmt::If { body, .. } => validate(body, false),
+            Stmt::If {
+                base_case,
+                elif_cases,
+                else_body,
+            } => {
+                validate(&base_case.body, false);
+                elif_cases.iter().for_each(|case| {
+                    validate(&case.body, false);
+                });
+                if let Some(else_body) = else_body {
+                    validate(else_body, false);
+                }
+            }
             Stmt::For { body, .. } => validate(body, false),
             Stmt::FuncDecl { body, .. } => validate(body, false),
             Stmt::StructDecl { .. } => (),

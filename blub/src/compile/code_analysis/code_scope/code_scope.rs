@@ -8,7 +8,9 @@ use petgraph::{Direction, prelude::DiGraphMap};
 use crate::{
     blub_compile_error, blub_ice,
     compile::{
-        code_analysis::code_analyzer::CodeAnalyzerData,
+        code_analysis::{
+            code_analyzer::CodeAnalyzerData, code_scope::ast_analysis::IfAnalysisGuardCase,
+        },
         parser::ast::{ArrayInitExprKind, Expr, Stmt},
         types::type_registry::{NumberTypes, TypeHandle, TypeInfo, TypeRegistry},
     },
@@ -926,17 +928,54 @@ impl CodeScope {
                 });
                 parser.add_expr_debug_name(init_expr_handle, format!("variable {}", name));
             }
-            Stmt::If { guard, body } => {
-                let guard_expr_handle = self.parse_ast_expr(guard, data);
-                let _ = parser.get_expected_info_expr_type(guard_expr_handle, TypeInfo::Bool, data);
-                let new_scope_handle = parser.new_scope(Some(self.handle), self.in_fn.clone());
-                let new_scope = parser.get_scope_mut(new_scope_handle);
-                new_scope.parse_code_block(body, data);
+            Stmt::If {
+                base_case,
+                elif_cases,
+                else_body,
+            } => {
+                let base_guard_expr_handle = self.parse_ast_expr(base_case.guard, data);
+                parser
+                    .get_expected_info_expr_type(base_guard_expr_handle, TypeInfo::Bool, data)
+                    .unwrap();
+                let new_base_scope_handle = parser.new_scope(Some(self.handle), self.in_fn.clone());
+                let new_base_scope = parser.get_scope_mut(new_base_scope_handle);
+                new_base_scope.parse_code_block(base_case.body, data);
+
+                let elif_cases = elif_cases
+                    .iter()
+                    .map(|case| {
+                        let elif_guard_expr_handle = self.parse_ast_expr(case.guard.clone(), data);
+                        parser
+                            .get_expected_info_expr_type(
+                                elif_guard_expr_handle,
+                                TypeInfo::Bool,
+                                data,
+                            )
+                            .unwrap();
+                        let new_elif_scope_handle =
+                            parser.new_scope(Some(self.handle), self.in_fn.clone());
+                        let new_elif_scope = parser.get_scope_mut(new_elif_scope_handle);
+                        new_elif_scope.parse_code_block(case.body.clone(), data);
+                        IfAnalysisGuardCase::new(elif_guard_expr_handle, new_elif_scope_handle)
+                    })
+                    .collect();
 
                 self.stmts.push(AnalysisStmt::If {
-                    stmt,
-                    scope: new_scope_handle,
-                    guard: guard_expr_handle,
+                    base_case: IfAnalysisGuardCase {
+                        guard: base_guard_expr_handle,
+                        scope: new_base_scope_handle,
+                    },
+                    elif_cases,
+                    else_case: match else_body {
+                        Some(else_body) => {
+                            let new_elif_scope_handle =
+                                parser.new_scope(Some(self.handle), self.in_fn.clone());
+                            let new_elif_scope = parser.get_scope_mut(new_elif_scope_handle);
+                            new_elif_scope.parse_code_block(else_body, data);
+                            Some(new_elif_scope_handle)
+                        }
+                        None => None,
+                    },
                 });
             }
             Stmt::For {
@@ -1076,25 +1115,34 @@ impl CodeScope {
                 });
             }
             Stmt::Retrun(expr) => {
-                let expr_handle = self.parse_ast_expr(expr, data);
                 let in_fn = self.in_fn.clone().unwrap();
                 let (ret_type, _) = type_reg
                     .get_type_info(*type_reg.fn_name_to_handle.get(&in_fn).unwrap())
                     .into_fn()
                     .unwrap();
+                if let Some(expr) = expr {
+                    let expr_handle = self.parse_ast_expr(expr, data);
 
-                if let Err(got) = parser.get_expected_expr_type(expr_handle, ret_type, data) {
-                    blub_compile_error!(
-                        "expected {} but got {}",
-                        type_reg.type_to_string(ret_type),
-                        type_reg.type_to_string(got)
-                    );
+                    if let Err(got) = parser.get_expected_expr_type(expr_handle, ret_type, data) {
+                        blub_compile_error!(
+                            "expected {} but got {}",
+                            type_reg.type_to_string(ret_type),
+                            type_reg.type_to_string(got)
+                        );
+                    }
+
+                    self.stmts.push(AnalysisStmt::Return {
+                        stmt,
+                        expr: expr_handle,
+                    });
+                } else {
+                    if ret_type != type_reg.get_type_handle(&TypeInfo::Unit) {
+                        blub_compile_error!(
+                            "expected Unit but got {}",
+                            type_reg.type_to_string(ret_type),
+                        );
+                    }
                 }
-
-                self.stmts.push(AnalysisStmt::Return {
-                    stmt,
-                    expr: expr_handle,
-                });
             }
         }
     }

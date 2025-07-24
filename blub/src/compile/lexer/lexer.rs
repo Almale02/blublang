@@ -183,17 +183,19 @@ type LexerHandler = Box<dyn Fn(&mut Lexer) -> bool>;
 
 fn keyword_handler(keyword: &'static str, token: Token) -> LexerHandler {
     Box::new(move |lexer| {
-        let res = match Regex::new(format!(r"{}\s", keyword).as_str())
+        let res = match Regex::new(format!(r"({})($|[^a-zA-Z])", keyword).as_str())
             .unwrap()
-            .find(lexer.rem_code)
+            .captures(lexer.rem_code)
         {
             Some(x) => x,
             None => return false,
         };
-        if res.start() != 0 {
+        let capture = res.get(1).unwrap();
+
+        if capture.start() != 0 {
             return false;
         }
-        lexer.set_head(lexer.head + res.end());
+        lexer.set_head(lexer.head + capture.end());
         lexer.handle_whitespace();
         lexer.tokens.push(token.clone());
         true

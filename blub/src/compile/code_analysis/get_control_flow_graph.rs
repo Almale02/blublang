@@ -1,55 +1,102 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env::current_dir, fs::File, io::Write};
 
-use petgraph::prelude::DiGraphMap;
+use petgraph::{
+    algo,
+    dot::{Config, Dot},
+    prelude::DiGraphMap,
+};
 
-use crate::compile::code_analysis::{
-    code_analyzer::CodeAnalyzerData,
-    code_scope::{
-        ast_analysis::AnalysisStmt,
-        code_scope::{AnalysisStmtHandle, CodeScopeParser},
+use crate::{
+    blub_compile_error,
+    compile::{
+        code_analysis::code_scope::{
+            ast_analysis::AnalysisStmt,
+            code_scope::{AnalysisStmtHandle, CodeScopeParser},
+        },
+        types::type_registry::{TypeInfo, TypeRegistry},
     },
 };
 
 type ControlFlowGraph = DiGraphMap<AnalysisStmtHandle, ()>;
+#[derive(Default)]
 pub struct ControlFlowGraphs {
     pub graph_fn_map: HashMap<String, ControlFlowGraph>,
 }
 impl ControlFlowGraphs {
-    pub fn create_control_flow_graph_for_fn(
+    pub fn check_functions_return_correctly(
         &mut self,
-        analyzer_data: &mut CodeAnalyzerData,
-        fn_name: String,
+        code_scope_parser: &CodeScopeParser,
+        type_reg: &TypeRegistry,
     ) {
-        let mut graph = ControlFlowGraph::default();
-        let code_scope_parser = analyzer_data.get::<CodeScopeParser>();
+        for (name, graph) in self.graph_fn_map.iter() {
+            let (ret_type, _args) = type_reg
+                .get_type_info(*type_reg.fn_name_to_handle.get(name).unwrap())
+                .into_fn()
+                .unwrap();
+            if ret_type != type_reg.get_type_handle(&TypeInfo::Unit) {
+                println!("checked {}", name);
+                if name == "main" {
+                    let dot = Dot::with_config(graph, &[Config::EdgeNoLabel]);
+
+                    let mut path = current_dir().unwrap();
+                    path.push("main.dot");
+                    dbg!(&path);
+
+                    let mut file = File::create(&path).unwrap();
+                    write!(file, "{:?}", dot).unwrap();
+                }
+                if !self.check_all_paths_return(code_scope_parser, name, graph) {
+                    blub_compile_error!(
+                        "function: {} have control flow paths which doesnt return correctly",
+                        name
+                    );
+                }
+            }
+        }
+    }
+    pub fn check_all_paths_return(
+        &self,
+        code_scope_parser: &CodeScopeParser,
+        fn_name: &String,
+        graph: &ControlFlowGraph,
+    ) -> bool {
         let fn_scope = code_scope_parser
             .fn_name_to_code_scope
-            .get(&fn_name)
+            .get(fn_name)
             .unwrap();
         let fn_body = &code_scope_parser.get_scope_ref(*fn_scope).stmts;
-        if !fn_body.is_empty() {
-            let end_node = AnalysisStmtHandle::INVALID;
-            let last_conns = self.analyze_stmt(
-                fn_body,
-                AnalysisStmtHandle {
-                    scope: *fn_scope,
-                    idx: 0,
-                },
-                vec![],
-                code_scope_parser,
-                &mut graph,
-            );
-            graph.add_node(end_node);
-            last_conns.iter().for_each(|prev| {
-                graph.add_edge(*prev, end_node, ());
-            });
+        if fn_body.is_empty() {
+            return false;
         }
-        self.graph_fn_map.insert(fn_name, graph);
+        let start_node = AnalysisStmtHandle {
+            scope: *fn_scope,
+            idx: 0,
+        };
+        !algo::has_path_connecting(graph, start_node, AnalysisStmtHandle::INVALID, None)
     }
-    pub fn check_all_paths_return(&mut self, fn_name: &String) -> bool {
-        let graph = self.graph_fn_map.get(fn_name).unwrap();
-
-        todo!()
+    pub fn create_control_flow_graphs(&mut self, code_scope_parser: &CodeScopeParser) {
+        for (fn_name, fn_scope) in code_scope_parser.fn_name_to_code_scope.iter() {
+            let mut graph = ControlFlowGraph::default();
+            let fn_body = &code_scope_parser.get_scope_ref(*fn_scope).stmts;
+            if !fn_body.is_empty() {
+                let end_node = AnalysisStmtHandle::INVALID;
+                let last_conns = self.analyze_stmt(
+                    fn_body,
+                    AnalysisStmtHandle {
+                        scope: *fn_scope,
+                        idx: 0,
+                    },
+                    vec![],
+                    code_scope_parser,
+                    &mut graph,
+                );
+                graph.add_node(end_node);
+                last_conns.iter().for_each(|prev| {
+                    graph.add_edge(*prev, end_node, ());
+                });
+            }
+            self.graph_fn_map.insert(fn_name.clone(), graph);
+        }
     }
     /// _Returns:_ the statements which has a direct path to the next statement in the upper scope
     /// so for non conditional statements the last stmt in the scope
@@ -66,14 +113,18 @@ impl ControlFlowGraphs {
         match current_stmt {
             AnalysisStmt::FunctionDecl { .. } => unreachable!(),
             AnalysisStmt::StructDecl { .. } => unreachable!(),
-            AnalysisStmt::If { scope, .. } => {
+            AnalysisStmt::If {
+                base_case,
+                elif_cases,
+                else_case,
+            } => {
                 graph.add_node(current_handle);
-                let body = &code_scope_parser.get_scope_ref(*scope).stmts;
-                let last_conns_in_body = if !body.is_empty() {
+                let base_body = &code_scope_parser.get_scope_ref(base_case.scope).stmts;
+                let last_conns_in_base_body = if !base_body.is_empty() {
                     Some(self.analyze_stmt(
-                        body,
+                        base_body,
                         AnalysisStmtHandle {
-                            scope: *scope,
+                            scope: base_case.scope,
                             idx: 0,
                         },
                         vec![current_handle],
@@ -169,7 +220,7 @@ impl ControlFlowGraphs {
                 prev_conns.iter().for_each(|prev| {
                     graph.add_edge(*prev, current_handle, ());
                 });
-                return vec![current_handle];
+                return vec![];
             }
         }
     }
