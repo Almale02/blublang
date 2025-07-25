@@ -1,2 +1,6 @@
 digraph {
+    0 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(2), idx: 0 }" ]
+    1 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(2), idx: 1 }" ]
+    2 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(0), idx: 0 }" ]
+    0 -> 1 [ ]
 }

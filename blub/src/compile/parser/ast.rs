@@ -186,7 +186,7 @@ impl Stmt {
         }
     }
 }
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum StmtId {
     VarDecl,
     If,

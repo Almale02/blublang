@@ -106,9 +106,10 @@ impl CodeScope {
         None
     }
     pub fn parse_code_block(&mut self, block: Vec<Stmt>, data: &CodeAnalyzerData) {
-        block
-            .iter()
-            .for_each(|x| self.parse_ast_stmt(x.clone(), data));
+        for x in block {
+            dbg!(x.to_id());
+            self.parse_ast_stmt(x.clone(), data);
+        }
     }
     #[allow(clippy::collapsible_match)]
     pub fn parse_ast_expr<'a>(
@@ -959,7 +960,7 @@ impl CodeScope {
                         IfAnalysisGuardCase::new(elif_guard_expr_handle, new_elif_scope_handle)
                     })
                     .collect();
-
+                println!("statements so far: {:?}", &self.stmts);
                 self.stmts.push(AnalysisStmt::If {
                     base_case: IfAnalysisGuardCase {
                         guard: base_guard_expr_handle,
@@ -977,6 +978,7 @@ impl CodeScope {
                         None => None,
                     },
                 });
+                println!("statements after: {:?}", &self.stmts);
             }
             Stmt::For {
                 capture,
@@ -1051,6 +1053,7 @@ impl CodeScope {
             Stmt::FuncDecl {
                 name, args, body, ..
             } => {
+                dbg!(&body);
                 let new_scope_handle = parser.new_scope(Some(self.handle), Some(name.clone()));
                 parser
                     .fn_name_to_code_scope
@@ -1079,6 +1082,9 @@ impl CodeScope {
                 parser
                     .get_scope_mut(new_scope_handle)
                     .parse_code_block(body, data);
+
+                let fn_body = &parser.get_scope_ref(new_scope_handle).stmts;
+                dbg!(fn_body);
                 self.stmts.push(AnalysisStmt::FunctionDecl {
                     stmt,
                     fn_info,
