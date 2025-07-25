@@ -35,6 +35,7 @@ fn build(code: String) {
     let mut parser = Parser::new(&parser_handlers, &lexer.tokens);
     parser.setup();
     let ast = parser.parse();
+    dbg!(&ast);
     //
     //
     let code_analyzer_data = Box::leak(Box::new(CodeAnalyzerData::new(&ast)));

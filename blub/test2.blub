@@ -1,10 +1,11 @@
-fn main(): u64 {
+fn main(): u32 {
 	if 1 == 1 {
-		let a = 3;
-		print_u32(a);
+		let a = 2;
+		return a;
+	} else {
+		let a = 2;
 		return a;
 	}
-	return 3;
+	return 1;
 }
-fn print_u32(x: u32) {}
 

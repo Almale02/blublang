@@ -24,6 +24,7 @@ impl LexerHandlers {
                 //
                 false
             }),
+            keyword_handler("else", Token::Else),
             keyword_handler("return", Token::Return),
             keyword_handler("let", Token::Let),
             keyword_handler("mut", Token::Mut),

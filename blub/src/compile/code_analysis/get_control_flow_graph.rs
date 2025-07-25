@@ -37,6 +37,7 @@ impl ControlFlowGraphs {
                 println!("checked {}", name);
                 if name == "main" {
                     let dot = Dot::with_config(graph, &[Config::EdgeNoLabel]);
+                    dbg!(graph.node_count());
 
                     let mut path = current_dir().unwrap();
                     path.push("main.dot");
@@ -119,9 +120,10 @@ impl ControlFlowGraphs {
                 else_case,
             } => {
                 graph.add_node(current_handle);
+                let mut conns_to_next = vec![];
                 let base_body = &code_scope_parser.get_scope_ref(base_case.scope).stmts;
-                let last_conns_in_base_body = if !base_body.is_empty() {
-                    Some(self.analyze_stmt(
+                if !base_body.is_empty() {
+                    let last_conns_in_base_bod = self.analyze_stmt(
                         base_body,
                         AnalysisStmtHandle {
                             scope: base_case.scope,
@@ -130,18 +132,49 @@ impl ControlFlowGraphs {
                         vec![current_handle],
                         code_scope_parser,
                         graph,
-                    ))
-                } else {
-                    None
-                };
+                    );
+                    conns_to_next.extend_from_slice(&last_conns_in_base_bod);
+                }
                 prev_conns.iter().for_each(|prev| {
                     graph.add_edge(*prev, current_handle, ());
                 });
-                let mut conns_to_next = vec![];
-                if let Some(lasts) = last_conns_in_body {
-                    conns_to_next.extend_from_slice(&lasts);
-                }
-                conns_to_next.push(current_handle);
+                println!("before else is: {}", graph.node_count());
+                if let Some(else_case) = else_case {
+                    let else_body = &code_scope_parser.get_scope_ref(*else_case).stmts;
+                    if !else_body.is_empty() {
+                        let last_conns_in_else_body = self.analyze_stmt(
+                            else_body,
+                            AnalysisStmtHandle {
+                                scope: *else_case,
+                                idx: 0,
+                            },
+                            vec![current_handle],
+                            code_scope_parser,
+                            graph,
+                        );
+
+                        conns_to_next.extend_from_slice(&last_conns_in_else_body);
+                    }
+                } else {
+                    conns_to_next.push(current_handle);
+                };
+                /*elif_cases.iter().for_each(|case| {
+                    let elif_body = &code_scope_parser.get_scope_ref(case.scope).stmts;
+                    if !elif_body.is_empty() {
+                        let last_conns_in_elif_body = self.analyze_stmt(
+                            elif_body,
+                            AnalysisStmtHandle {
+                                scope: case.scope,
+                                idx: 0,
+                            },
+                            vec![current_handle],
+                            code_scope_parser,
+                            graph,
+                        );
+
+                        conns_to_next.extend_from_slice(&last_conns_in_elif_body);
+                    }
+                });*/
                 if let Some(_) = stmts.get(current_handle.idx + 1) {
                     return self.analyze_stmt(
                         stmts,
