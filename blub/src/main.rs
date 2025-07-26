@@ -35,7 +35,6 @@ fn build(code: String) {
     let mut parser = Parser::new(&parser_handlers, &lexer.tokens);
     parser.setup();
     let ast = parser.parse();
-    dbg!(&ast);
     //
     //
     let code_analyzer_data = Box::leak(Box::new(CodeAnalyzerData::new(&ast)));
@@ -61,10 +60,20 @@ fn build(code: String) {
         .analize(&code_analyzer_data);
     analyze_struct.analize(&code_analyzer_data);
     analyze_fn.analize(&code_analyzer_data);
+    {
+        let root_scope = code_scope_parser.new_root_scope();
+        root_scope.parse_code_block(ast.clone(), &code_analyzer_data);
+    }
 
-    let root_scope = code_scope_parser.new_root_scope();
+    let main_scope_handle = code_scope_parser.fn_name_to_code_scope.get("main").unwrap();
+    let main_scope = code_scope_parser.get_scope_ref(*main_scope_handle);
 
-    root_scope.parse_code_block(ast.clone(), &code_analyzer_data);
+    main_scope
+        .stmts
+        .iter()
+        .for_each(|x| println!("in main builid {:?}", x));
+    println!("in main build len: {}", main_scope.stmts.len()); // here they are gone, only the first is there
+
     let control_flow_graph = code_analyzer_data.get_mut::<ControlFlowGraphs>();
     control_flow_graph.create_control_flow_graphs(code_scope_parser);
     control_flow_graph.check_functions_return_correctly(code_scope_parser, type_reg);

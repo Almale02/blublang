@@ -28,7 +28,6 @@ impl ControlFlowGraphs {
         code_scope_parser: &CodeScopeParser,
         type_reg: &TypeRegistry,
     ) {
-        println!("ran check functions return correctly");
         for (name, graph) in self.graph_fn_map.iter() {
             let (ret_type, _args) = type_reg
                 .get_type_info(*type_reg.fn_name_to_handle.get(name).unwrap())
@@ -42,7 +41,6 @@ impl ControlFlowGraphs {
 
                     let mut path = current_dir().unwrap();
                     path.push("main.dot");
-                    dbg!(&path);
 
                     let mut file = File::create(&path).unwrap();
                     write!(file, "{:?}", dot).unwrap();
@@ -62,7 +60,6 @@ impl ControlFlowGraphs {
         fn_name: &String,
         graph: &ControlFlowGraph,
     ) -> bool {
-        println!("ran check all paths return");
         let fn_scope = code_scope_parser
             .fn_name_to_code_scope
             .get(fn_name)
@@ -78,11 +75,9 @@ impl ControlFlowGraphs {
         !algo::has_path_connecting(graph, start_node, AnalysisStmtHandle::INVALID, None)
     }
     pub fn create_control_flow_graphs(&mut self, code_scope_parser: &CodeScopeParser) {
-        dbg!("ran create control flow graphs");
         for (fn_name, fn_scope) in code_scope_parser.fn_name_to_code_scope.iter() {
             let mut graph = ControlFlowGraph::default();
             let fn_body = &code_scope_parser.get_scope_ref(*fn_scope).stmts;
-            dbg!(fn_body);
             if !fn_body.is_empty() {
                 let end_node = AnalysisStmtHandle::INVALID;
                 let last_conns = self.analyze_stmt(
@@ -123,7 +118,6 @@ impl ControlFlowGraphs {
                 elif_cases,
                 else_case,
             } => {
-                dbg!("ran analyze if stmt");
                 graph.add_node(current_handle);
                 let mut conns_to_next = vec![];
                 let base_body = &code_scope_parser.get_scope_ref(base_case.scope).stmts;

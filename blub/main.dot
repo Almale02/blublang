@@ -1,6 +1,15 @@
 digraph {
     0 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(2), idx: 0 }" ]
     1 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(2), idx: 1 }" ]
-    2 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(0), idx: 0 }" ]
+    2 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(3), idx: 0 }" ]
+    3 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(3), idx: 1 }" ]
+    4 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(4), idx: 0 }" ]
+    5 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(4), idx: 1 }" ]
+    6 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(2), idx: 2 }" ]
+    7 [ label = "AnalysisStmtHandle { scope: CodeScopeHandle(0), idx: 0 }" ]
+    1 -> 2 [ ]
+    2 -> 3 [ ]
     0 -> 1 [ ]
+    1 -> 4 [ ]
+    4 -> 5 [ ]
 }

@@ -123,7 +123,6 @@ impl Parser<'_> {
 
         let mut elif_cases = Vec::new();
         let mut else_body = None;
-        dbg!(self.curr_token().to_id());
         while self.curr_token().to_id() == TokenId::Else {
             self.advance();
             if self.curr_token().to_id() == TokenId::If {

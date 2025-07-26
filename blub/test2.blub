@@ -1,6 +1,5 @@
 fn main(): u32 {
 	let b = 2;
-	return 1;
 	if 1 == 1 {
 		let a = 2;
 		return a;
