@@ -1089,7 +1089,6 @@ impl CodeScope {
                     .get_scope_mut(new_scope_handle)
                     .parse_code_block(body, data);
 
-                let fn_body = &parser.get_scope_ref(new_scope_handle).stmts;
                 self.stmts.push(AnalysisStmt::FunctionDecl {
                     stmt,
                     fn_info,
@@ -1528,6 +1527,43 @@ impl CodeScopeParser {
     }
     pub fn add_expr_debug_name(&mut self, expr: CodeExprHandle, name: String) {
         self.expr_debug_name.insert(expr, name);
+    }
+}
+impl CodeScopeParser {
+    pub fn get_var_expr_handle_scope(&self, scope_handle: CodeScopeHandle, name: &String) {
+        let scope = self.get_scope_ref(scope_handle);
+        scope.get_var_expr_handle(name, self);
+    }
+    pub fn get_var_type_scope(&self, scope_handle: CodeScopeHandle, name: &String) {
+        let scope = self.get_scope_ref(scope_handle);
+        scope.get_var_type(name, self);
+    }
+    pub fn parse_code_block_scope(
+        &mut self,
+        scope_handle: CodeScopeHandle,
+        block: Vec<Stmt>,
+        data: &CodeAnalyzerData,
+    ) {
+        let scope = self.get_scope_mut(scope_handle);
+        scope.parse_code_block(block, data);
+    }
+    pub fn parse_ast_expr_scope(
+        &mut self,
+        scope_handle: CodeScopeHandle,
+        expr: Expr,
+        data: &CodeAnalyzerData,
+    ) {
+        let scope = self.get_scope_mut(scope_handle);
+        scope.parse_ast_expr(expr, data);
+    }
+    pub fn parse_ast_stmt_scope(
+        &mut self,
+        scope_handle: CodeScopeHandle,
+        expr: Stmt,
+        data: &CodeAnalyzerData,
+    ) {
+        let scope = self.get_scope_mut(scope_handle);
+        scope.parse_ast_stmt(expr, data);
     }
 }
 impl Default for CodeScopeParser {

@@ -157,7 +157,7 @@ impl ControlFlowGraphs {
                 } else {
                     conns_to_next.push(current_handle);
                 };
-                /*elif_cases.iter().for_each(|case| {
+                elif_cases.iter().for_each(|case| {
                     let elif_body = &code_scope_parser.get_scope_ref(case.scope).stmts;
                     if !elif_body.is_empty() {
                         let last_conns_in_elif_body = self.analyze_stmt(
@@ -173,7 +173,7 @@ impl ControlFlowGraphs {
 
                         conns_to_next.extend_from_slice(&last_conns_in_elif_body);
                     }
-                });*/
+                });
                 if let Some(_) = stmts.get(current_handle.idx + 1) {
                     return self.analyze_stmt(
                         stmts,
