@@ -90,6 +90,7 @@ impl ParserHandlers {
         self.stmt(TokenId::Fn, Box::new(|x| Parser::parse_fn_decl_stmt(x)));
         //
         //
+        self.nud(TokenId::Star, Box::new(|x| Parser::parse_deref_expr(x)));
         self.nud(TokenId::Not, Box::new(|x| Parser::parse_prefix_expr(x)));
         self.nud(TokenId::And, Box::new(|x| Parser::parse_ref_expr(x)));
         self.nud(TokenId::Number, Box::new(|x| Parser::parse_literal_expr(x)));

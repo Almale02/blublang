@@ -82,6 +82,10 @@ pub enum AnalysisExpr {
         pointee: CodeExprHandle,
         expr: CodeExprHandle,
     },
+    Deref {
+        rhs: CodeExprHandle,
+        expr: CodeExprHandle,
+    },
     Group {
         inner: CodeExprHandle,
         expr: CodeExprHandle,

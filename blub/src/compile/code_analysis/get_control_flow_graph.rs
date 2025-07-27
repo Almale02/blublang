@@ -37,7 +37,6 @@ impl ControlFlowGraphs {
                 println!("checked {}", name);
                 if name == "main" {
                     let dot = Dot::with_config(graph, &[Config::EdgeNoLabel]);
-                    dbg!(graph.node_count());
 
                     let mut path = current_dir().unwrap();
                     path.push("main.dot");
@@ -137,7 +136,6 @@ impl ControlFlowGraphs {
                 prev_conns.iter().for_each(|prev| {
                     graph.add_edge(*prev, current_handle, ());
                 });
-                println!("before else is: {}", graph.node_count());
                 if let Some(else_case) = else_case {
                     let else_body = &code_scope_parser.get_scope_ref(*else_case).stmts;
                     if !else_body.is_empty() {
@@ -195,7 +193,7 @@ impl ControlFlowGraphs {
                 });
                 let body = &code_scope_parser.get_scope_ref(*scope).stmts;
                 let last_conns_in_body = if !body.is_empty() {
-                    Some(self.analyze_stmt(
+                    self.analyze_stmt(
                         body,
                         AnalysisStmtHandle {
                             scope: *scope,
@@ -204,14 +202,12 @@ impl ControlFlowGraphs {
                         vec![current_handle],
                         code_scope_parser,
                         graph,
-                    ))
+                    )
                 } else {
-                    None
+                    vec![]
                 };
                 let mut conns_to_next = vec![];
-                if let Some(lasts) = last_conns_in_body {
-                    conns_to_next.extend_from_slice(&lasts);
-                }
+                conns_to_next.extend_from_slice(&last_conns_in_body);
                 conns_to_next.push(current_handle);
                 if let Some(_) = stmts.get(current_handle.idx + 1) {
                     return self.analyze_stmt(

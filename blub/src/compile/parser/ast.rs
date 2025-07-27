@@ -48,6 +48,9 @@ pub enum Expr {
         is_mut: bool,
         pointee: Box<Expr>,
     },
+    Deref {
+        right: Box<Expr>,
+    },
     Access {
         left: Box<Expr>,
         ident: String,
@@ -75,6 +78,7 @@ impl Expr {
             Expr::StructCreate { .. } => ExprId::StructCreate,
             Expr::Index { .. } => ExprId::Index,
             Expr::Ref { .. } => ExprId::Ref,
+            Expr::Deref { .. } => ExprId::Deref,
             Expr::Access { .. } => ExprId::Access,
             Expr::Group { .. } => ExprId::Group,
             Expr::ArrayInit { .. } => ExprId::ArrayInit,
@@ -102,6 +106,7 @@ pub enum ExprId {
     StructCreate,
     Index,
     Ref,
+    Deref,
     Access,
     Group,
     ArrayInit,
@@ -117,6 +122,7 @@ impl Display for ExprId {
             ExprId::StructCreate => "struct create expr",
             ExprId::Index => "index expr",
             ExprId::Ref => "ref expr",
+            ExprId::Deref => "deref expr",
             ExprId::Access => "access expr",
             ExprId::Group => "group expr",
             ExprId::ArrayInit => "array init expr",

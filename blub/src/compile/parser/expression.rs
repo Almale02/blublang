@@ -95,6 +95,13 @@ impl Parser<'_> {
             right: Box::new(right),
         }
     }
+    pub fn parse_deref_expr(&mut self) -> ParseExprRes {
+        self.advance_expect(TokenId::Star);
+        let right = self.parse_expr(BindingPower::Unary);
+        Expr::Deref {
+            right: Box::new(right),
+        }
+    }
     pub fn parse_ident(&mut self) -> ParseExprRes {
         Expr::Ident(self.advance_expect(TokenId::Ident).into_ident().unwrap())
     }

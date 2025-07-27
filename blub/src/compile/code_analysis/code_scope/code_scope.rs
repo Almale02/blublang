@@ -19,6 +19,13 @@ use crate::{
 use super::ast_analysis::{AnalysisExpr, AnalysisStmt, AnalysisStructField, ArrayInitAnalysisKind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Mutability {
+    Mutable,
+    Immutable,
+    Invalid,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct CodeExprHandle(pub u64);
 
@@ -166,11 +173,15 @@ impl CodeScope {
             }
             Expr::Ident(base_name) => {
                 let expr_handle = parser.new_expr(self.handle);
-                if let Some((var_expr_handle, _)) = self.get_var_expr_handle(&base_name, parser) {
-                    if let Some(type_handle) = parser
-                        .expr_to_static_type
-                        .get(&self.get_var_expr_handle(&base_name, parser).unwrap().0)
-                    {
+                if let Some((var_expr_handle, _)) =
+                    parser.get_var_expr_handle_scope(self.handle, &base_name)
+                {
+                    if let Some(type_handle) = parser.expr_to_static_type.get(
+                        &parser
+                            .get_var_expr_handle_scope(self.handle, &base_name)
+                            .unwrap()
+                            .0,
+                    ) {
                         parser.expr_to_static_type.insert(expr_handle, *type_handle);
                     }
                     parser.copy_type_or_infer_handle(
@@ -521,7 +532,6 @@ impl CodeScope {
 
                 expr_handle
             }
-
             Expr::Range { left, op, right } => {
                 let left_expr_handle = self.parse_ast_expr(*left, data);
                 let right_expr_handle = self.parse_ast_expr(*right, data);
@@ -786,17 +796,17 @@ impl CodeScope {
                             )
                         };
                         parser
-                            .get_expected_info_expr_type(
-                                count_expr_handle,
-                                TypeInfo::Number(NumberTypes::Usize),
-                                data,
-                            )
-                            .unwrap_or_else(|found| {
-                                blub_compile_error!(
-                                    "for initing struct with size, the size is expected to be usize but got {}",
-                                    type_reg.type_to_string(found)
-                                )
-                            });
+                                    .get_expected_info_expr_type(
+                                        count_expr_handle,
+                                        TypeInfo::Number(NumberTypes::Usize),
+                                        data,
+                                    )
+                                    .unwrap_or_else(|found| {
+                                        blub_compile_error!(
+                                            "for initing struct with size, the size is expected to be usize but got {}",
+                                            type_reg.type_to_string(found)
+                                        )
+                                    });
                         parser.expr_to_analysis.insert(
                             expr,
                             AnalysisExpr::ArrayInit {
@@ -812,70 +822,70 @@ impl CodeScope {
                         let mut got_infer_or_type: Option<TypeOrInferHandle> = None;
                         let mut got_type_on_expr: Option<CodeExprHandle> = None;
                         let items = items.iter().cloned().map(|item| {
-                            let item_expr_handle = self.parse_ast_expr(item, data);
-                            match parser.get_type_or_infer(item_expr_handle) {
-                                TypeOrInferHandle::Type(type_handle) => match got_infer_or_type {
-                                    Some(x) => match x {
-                                        TypeOrInferHandle::Type(got_type) => { // got item with known type and arr type is already known
-                                            if got_type != type_handle {
-                                                blub_compile_error!(
-                                                    "in array init prev items were {} but got {}",
-                                                    type_reg.type_to_string(got_type),
-                                                    type_reg.type_to_string(type_handle)
+                                    let item_expr_handle = self.parse_ast_expr(item, data);
+                                    match parser.get_type_or_infer(item_expr_handle) {
+                                        TypeOrInferHandle::Type(type_handle) => match got_infer_or_type {
+                                            Some(x) => match x {
+                                                TypeOrInferHandle::Type(got_type) => { // got item with known type and arr type is already known
+                                                    if got_type != type_handle {
+                                                        blub_compile_error!(
+                                                            "in array init prev items were {} but got {}",
+                                                            type_reg.type_to_string(got_type),
+                                                            type_reg.type_to_string(type_handle)
+                                                        );
+                                                    }
+                                                }
+                                                TypeOrInferHandle::Infer(got_infer) => { // got item  with infer type and arr type is already known
+                                                    parser.set_type_on_infer(got_type_on_expr.unwrap(), got_infer, type_handle, data);
+                                                    got_infer_or_type =
+                                                        Some(TypeOrInferHandle::Type(type_handle));
+                                                }
+                                            },
+                                            None => { // first item and it has a known type
+                                                got_type_on_expr = Some(item_expr_handle);
+                                                got_infer_or_type =
+                                                    Some(TypeOrInferHandle::Type(type_handle));
+                                                let array_type = type_reg.get_or_add_type(TypeInfo::Array { handle: type_handle });
+                                                parser.expr_type_map.insert(expr, array_type);
+                                            }
+                                        },
+                                        TypeOrInferHandle::Infer(expr_infer) => match got_infer_or_type {
+                                            Some(x) => match x {
+                                                TypeOrInferHandle::Type(got_type) => { // got item with known type but arr type is infered
+                                                    got_type_on_expr = Some(item_expr_handle);
+                                                    parser.set_type_on_infer(item_expr_handle, expr_infer, got_type, data);
+                                                }
+                                                TypeOrInferHandle::Infer(got_infer) => { // got item with infered type and arr type is also infered
+                                                    parser.expr_graph_add_edge(expr, item_expr_handle);
+                                                    parser.merge_infer_handles(expr_infer, got_infer);
+                                                }
+                                            },
+                                            None => { // got item with infered type and this is the first item
+                                                parser.expr_graph_add_edge(expr, item_expr_handle);
+                                                got_infer_or_type =
+                                                    Some(TypeOrInferHandle::Infer(expr_infer));
+                                                parser.copy_type_or_infer_handle(
+                                                    item_expr_handle,
+                                                    expr,
+                                                    Box::new(|handle, reg| reg.get_or_add_type(TypeInfo::Array { handle })),
+                                                    data
+                                                );
+                                                parser.add_infer_transformer(
+                                                    expr,
+                                                    Box::new(|info, reg| {
+                                                        info.into_array().unwrap_or_else(|info| {
+                                                            blub_compile_error!(
+                                                                "infer unpacking expected array but got {}",
+                                                                reg.info_to_string(info.clone())
+                                                            )
+                                                        })
+                                                    }),
                                                 );
                                             }
-                                        }
-                                        TypeOrInferHandle::Infer(got_infer) => { // got item  with infer type and arr type is already known
-                                            parser.set_type_on_infer(got_type_on_expr.unwrap(), got_infer, type_handle, data);
-                                            got_infer_or_type =
-                                                Some(TypeOrInferHandle::Type(type_handle));
-                                        }
-                                    },
-                                    None => { // first item and it has a known type
-                                        got_type_on_expr = Some(item_expr_handle);
-                                        got_infer_or_type =
-                                            Some(TypeOrInferHandle::Type(type_handle));
-                                        let array_type = type_reg.get_or_add_type(TypeInfo::Array { handle: type_handle });
-                                        parser.expr_type_map.insert(expr, array_type);
+                                        },
                                     }
-                                },
-                                TypeOrInferHandle::Infer(expr_infer) => match got_infer_or_type {
-                                    Some(x) => match x {
-                                        TypeOrInferHandle::Type(got_type) => { // got item with known type but arr type is infered
-                                            got_type_on_expr = Some(item_expr_handle);
-                                            parser.set_type_on_infer(item_expr_handle, expr_infer, got_type, data);
-                                        }
-                                        TypeOrInferHandle::Infer(got_infer) => { // got item with infered type and arr type is also infered
-                                            parser.expr_graph_add_edge(expr, item_expr_handle);
-                                            parser.merge_infer_handles(expr_infer, got_infer);
-                                        }
-                                    },
-                                    None => { // got item with infered type and this is the first item
-                                        parser.expr_graph_add_edge(expr, item_expr_handle);
-                                        got_infer_or_type =
-                                            Some(TypeOrInferHandle::Infer(expr_infer));
-                                        parser.copy_type_or_infer_handle(
-                                            item_expr_handle,
-                                            expr,
-                                            Box::new(|handle, reg| reg.get_or_add_type(TypeInfo::Array { handle })),
-                                            data
-                                        );
-                                        parser.add_infer_transformer(
-                                            expr,
-                                            Box::new(|info, reg| {
-                                                info.into_array().unwrap_or_else(|info| {
-                                                    blub_compile_error!(
-                                                        "infer unpacking expected array but got {}",
-                                                        reg.info_to_string(info.clone())
-                                                    )
-                                                })
-                                            }),
-                                        );
-                                    }
-                                },
-                            }
-                            item_expr_handle
-                        }).collect::<Vec<_>>();
+                                    item_expr_handle
+                                }).collect::<Vec<_>>();
                         parser.expr_to_analysis.insert(
                             expr,
                             AnalysisExpr::ArrayInit {
@@ -909,8 +919,104 @@ impl CodeScope {
 
                 expr_handle
             }
+            Expr::Deref { right } => {
+                let right_expr_handle = self.parse_ast_expr(*right, data);
+                let expr_handle = parser.new_expr(self.handle);
+
+                if parser
+                    .copy_type_or_infer_handle(
+                        right_expr_handle,
+                        expr_handle,
+                        Box::new(|handle, reg| {
+                            reg.get_type_info(handle)
+                                .into_pointer()
+                                .unwrap_or_else(|_| {
+                                    blub_compile_error!("only pointers can be dereferenced")
+                                })
+                                .1
+                        }),
+                        data,
+                    )
+                    .is_some()
+                {
+                    parser.add_infer_transformer(
+                        expr_handle,
+                        Box::new(|info, reg| {
+                            reg.get_or_add_type(TypeInfo::Pointer {
+                                is_mut: true,
+                                pointee: reg.get_type_handle(&info),
+                            })
+                        }),
+                    );
+                }
+                parser.expr_to_analysis.insert(
+                    expr_handle,
+                    AnalysisExpr::Deref {
+                        rhs: right_expr_handle,
+                        expr: expr_handle,
+                    },
+                );
+                expr_handle
+            }
         }
     }
+    /*
+
+            Expr::Index { base, index } => {
+                let expr_handle = parser.new_expr(self.handle);
+                let base_expr_handle = self.parse_ast_expr(*base, data);
+                let index_expr_handle = self.parse_ast_expr(*index, data);
+
+                if parser
+                    .copy_type_or_infer_handle(
+                        base_expr_handle,
+                        expr_handle,
+                        Box::new(|handle, reg| {
+                            reg.get_type_info(handle).into_array().unwrap_or_else(|_| {
+                                blub_compile_error!("only arrays can be indexed")
+                            })
+                        }),
+                        data,
+                    )
+                    .is_some()
+                {
+                    parser.add_infer_transformer(
+                        expr_handle,
+                        Box::new(|info, reg| {
+                            reg.get_or_add_type(TypeInfo::Array {
+                                handle: reg.get_type_handle(&info),
+                            })
+                        }),
+                    );
+                };
+
+                parser
+                    .get_expected_info_expr_type(
+                        index_expr_handle,
+                        TypeInfo::Number(NumberTypes::Usize),
+                        data,
+                    )
+                    .unwrap_or_else(|found| {
+                        blub_compile_error!(
+                            "indexes into arrays need to have type usize, but was {}",
+                            type_reg.type_to_string(found)
+                        )
+                    });
+
+                parser.expr_to_analysis.insert(
+                    expr_handle,
+                    AnalysisExpr::Index {
+                        base: base_expr_handle,
+                        index: index_expr_handle,
+                        expr: expr_handle,
+                    },
+                );
+
+                expr_handle
+            }
+
+
+    */
     pub fn parse_ast_stmt(&mut self, stmt: Stmt, data: &CodeAnalyzerData) {
         let type_reg = data.get_mut::<TypeRegistry>();
         let parser = data.get_mut::<CodeScopeParser>();
@@ -920,15 +1026,23 @@ impl CodeScope {
                 is_mut: _,
                 init_value,
             } => {
-                if self.get_var_expr_handle(&name, parser).is_some() {
+                let parent_handle = self.handle;
+                if parser
+                    .get_var_expr_handle_scope(parent_handle, &name)
+                    .is_some()
+                {
                     blub_compile_error!("redefinition of variable {}", name);
                 }
                 if init_value.is_none() {
                     blub_compile_error!("init values expected for variables");
                 }
-                let init_expr_handle = self.parse_ast_expr(init_value.unwrap(), data);
-                self.var_name_to_expr.insert(name.clone(), init_expr_handle);
-                self.stmts.push(AnalysisStmt::VarDecl {
+                let init_expr_handle =
+                    parser.parse_ast_expr_scope(parent_handle, init_value.unwrap(), data);
+                let parent_scope = parser.get_scope_mut(parent_handle);
+                parent_scope
+                    .var_name_to_expr
+                    .insert(name.clone(), init_expr_handle);
+                parent_scope.stmts.push(AnalysisStmt::VarDecl {
                     stmt,
                     init_value: init_expr_handle,
                 });
@@ -939,18 +1053,23 @@ impl CodeScope {
                 elif_cases,
                 else_body,
             } => {
-                let base_guard_expr_handle = self.parse_ast_expr(base_case.guard, data);
+                let parent_handle = self.handle;
+                let parent_fn = self.in_fn.clone();
+
+                let base_guard_expr_handle =
+                    parser.parse_ast_expr_scope(parent_handle, base_case.guard, data);
                 parser
                     .get_expected_info_expr_type(base_guard_expr_handle, TypeInfo::Bool, data)
                     .unwrap();
-                let new_base_scope_handle = parser.new_scope(Some(self.handle), self.in_fn.clone());
-                let new_base_scope = parser.get_scope_mut(new_base_scope_handle);
-                new_base_scope.parse_code_block(base_case.body, data);
+                let new_base_scope_handle =
+                    parser.new_scope(Some(parent_handle), parent_fn.clone());
+                parser.parse_code_block_scope(new_base_scope_handle, base_case.body, data);
 
                 let elif_cases = elif_cases
                     .iter()
                     .map(|case| {
-                        let elif_guard_expr_handle = self.parse_ast_expr(case.guard.clone(), data);
+                        let elif_guard_expr_handle =
+                            parser.parse_ast_expr_scope(parent_handle, case.guard.clone(), data);
                         parser
                             .get_expected_info_expr_type(
                                 elif_guard_expr_handle,
@@ -959,33 +1078,35 @@ impl CodeScope {
                             )
                             .unwrap();
                         let new_elif_scope_handle =
-                            parser.new_scope(Some(self.handle), self.in_fn.clone());
-                        let new_elif_scope = parser.get_scope_mut(new_elif_scope_handle);
-                        new_elif_scope.parse_code_block(case.body.clone(), data);
+                            parser.new_scope(Some(parent_handle), parent_fn.clone());
+                        parser.parse_code_block_scope(
+                            new_elif_scope_handle,
+                            case.body.clone(),
+                            data,
+                        );
                         IfAnalysisGuardCase::new(elif_guard_expr_handle, new_elif_scope_handle)
                     })
                     .collect();
-                self.stmts.iter().for_each(|x| println!("before: {:?}", x));
-                //println!("statements so far: {:?}", &self.stmts);
-                self.stmts.push(AnalysisStmt::If {
+
+                let else_case = match else_body {
+                    Some(else_body) => {
+                        let new_else_scope_handle =
+                            parser.new_scope(Some(parent_handle), parent_fn);
+                        parser.parse_code_block_scope(new_else_scope_handle, else_body, data);
+                        Some(new_else_scope_handle)
+                    }
+                    None => None,
+                };
+
+                let parent_scope = parser.get_scope_mut(parent_handle);
+                parent_scope.stmts.push(AnalysisStmt::If {
                     base_case: IfAnalysisGuardCase {
                         guard: base_guard_expr_handle,
                         scope: new_base_scope_handle,
                     },
                     elif_cases,
-                    else_case: match else_body {
-                        Some(else_body) => {
-                            let new_elif_scope_handle =
-                                parser.new_scope(Some(self.handle), self.in_fn.clone());
-                            let new_elif_scope = parser.get_scope_mut(new_elif_scope_handle);
-                            new_elif_scope.parse_code_block(else_body, data);
-                            Some(new_elif_scope_handle)
-                        }
-                        None => None,
-                    },
+                    else_case,
                 });
-                self.stmts.iter().for_each(|x| println!("after: {:?}", x));
-                //println!("statements after: {:?}", &self.stmts);
             }
             Stmt::For {
                 capture,
@@ -1060,7 +1181,8 @@ impl CodeScope {
             Stmt::FuncDecl {
                 name, args, body, ..
             } => {
-                let new_scope_handle = parser.new_scope(Some(self.handle), Some(name.clone()));
+                let parent_handle = self.handle;
+                let new_scope_handle = parser.new_scope(Some(parent_handle), Some(name.clone()));
                 parser
                     .fn_name_to_code_scope
                     .insert(name.clone(), new_scope_handle);
@@ -1070,7 +1192,7 @@ impl CodeScope {
 
                 for (i, arg) in args.iter().enumerate() {
                     let arg_type = type_fn_args[i];
-                    let arg_expr_handle = parser.new_expr(self.handle);
+                    let arg_expr_handle = parser.new_expr(parent_handle);
                     parser.expr_type_map.insert(arg_expr_handle, arg_type);
                     parser.expr_to_analysis.insert(
                         arg_expr_handle,
@@ -1085,17 +1207,19 @@ impl CodeScope {
                         .var_name_to_expr
                         .insert(arg.name.clone(), arg_expr_handle);
                 }
-                parser
-                    .get_scope_mut(new_scope_handle)
-                    .parse_code_block(body, data);
+                parser.parse_code_block_scope(new_scope_handle, body, data);
 
-                self.stmts.push(AnalysisStmt::FunctionDecl {
-                    stmt,
-                    fn_info,
-                    scope: new_scope_handle,
-                });
+                parser
+                    .get_scope_mut(parent_handle)
+                    .stmts
+                    .push(AnalysisStmt::FunctionDecl {
+                        stmt,
+                        fn_info,
+                        scope: new_scope_handle,
+                    });
             }
             Stmt::StructDecl { name, fields, .. } => {
+                let parent_handle = self.handle;
                 let struct_type_handle = *type_reg.struct_name_to_handle.get(&name).unwrap();
                 let struct_info = type_reg.get_type_info(struct_type_handle);
                 let (_, type_struct_fields) = struct_info.into_struct().unwrap();
@@ -1109,29 +1233,38 @@ impl CodeScope {
                         init_value: ast_field
                             .default_value
                             .clone()
-                            .map(|x| self.parse_ast_expr(x, data)),
+                            .map(|x| parser.parse_ast_expr_scope(parent_handle, x, data)),
                     })
                     .collect::<Vec<_>>();
-                self.stmts.push(AnalysisStmt::StructDecl {
-                    stmt,
-                    fields: analysis_fields,
-                });
+                parser
+                    .get_scope_mut(parent_handle)
+                    .stmts
+                    .push(AnalysisStmt::StructDecl {
+                        stmt,
+                        fields: analysis_fields,
+                    });
             }
             Stmt::ExprStmt(expr) => {
-                let expr_handle = self.parse_ast_expr(expr, data);
-                self.stmts.push(AnalysisStmt::ExprStmt {
-                    stmt,
-                    expr: expr_handle,
-                });
+                let parent_handle = self.handle;
+                let expr_handle = parser.parse_ast_expr_scope(parent_handle, expr, data);
+                parser
+                    .get_scope_mut(parent_handle)
+                    .stmts
+                    .push(AnalysisStmt::ExprStmt {
+                        stmt,
+                        expr: expr_handle,
+                    });
             }
             Stmt::Retrun(expr) => {
-                let in_fn = self.in_fn.clone().unwrap();
+                let parent_handle = self.handle;
+                let parent_scope = parser.get_scope_mut(parent_handle);
+                let in_fn = parent_scope.in_fn.clone().unwrap();
                 let (ret_type, _) = type_reg
                     .get_type_info(*type_reg.fn_name_to_handle.get(&in_fn).unwrap())
                     .into_fn()
                     .unwrap();
                 if let Some(expr) = expr {
-                    let expr_handle = self.parse_ast_expr(expr, data);
+                    let expr_handle = parser.parse_ast_expr_scope(parent_handle, expr, data);
 
                     if let Err(got) = parser.get_expected_expr_type(expr_handle, ret_type, data) {
                         blub_compile_error!(
@@ -1141,10 +1274,13 @@ impl CodeScope {
                         );
                     }
 
-                    self.stmts.push(AnalysisStmt::Return {
-                        stmt,
-                        expr: expr_handle,
-                    });
+                    parser
+                        .get_scope_mut(parent_handle)
+                        .stmts
+                        .push(AnalysisStmt::Return {
+                            stmt,
+                            expr: expr_handle,
+                        });
                 } else {
                     if ret_type != type_reg.get_type_handle(&TypeInfo::Unit) {
                         blub_compile_error!(
@@ -1153,9 +1289,6 @@ impl CodeScope {
                         );
                     }
                 }
-                self.stmts
-                    .iter()
-                    .for_each(|x| println!("in return: {:?}", x));
             }
         }
     }
@@ -1178,7 +1311,6 @@ pub type ExprGraph = DiGraphMap<CodeExprHandle, u8>;
 pub struct CodeScopeParser {
     pub fn_name_to_code_scope: HashMap<String, CodeScopeHandle>,
     pub next_expr_handle: u64,
-    pub next_sub_expr_handle: u64,
     pub next_scope_handle: u64,
     pub next_infer_type_handle: u64,
     //
@@ -1195,10 +1327,8 @@ pub struct CodeScopeParser {
     pub expr_to_analysis: HashMap<CodeExprHandle, AnalysisExpr>,
     pub expr_to_static_type: HashMap<CodeExprHandle, TypeHandle>,
     pub expr_to_code_scope: HashMap<CodeExprHandle, CodeScopeHandle>,
+    pub expr_mutability_map: HashMap<CodeExprHandle, Mutability>,
     //
-    pub sub_expr_type_map: HashMap<CodeSubExprHandle, TypeHandle>,
-    pub sub_expr_to_static_type: HashMap<CodeSubExprHandle, TypeHandle>,
-    pub sub_expr_to_code_scope: HashMap<CodeSubExprHandle, CodeScopeHandle>,
     pub expr_debug_name: HashMap<CodeExprHandle, String>,
     //
     pub parent_map: HashMap<CodeScopeHandle, HashSet<CodeScopeHandle>>,
@@ -1416,17 +1546,11 @@ impl CodeScopeParser {
     pub fn parent_has_expr(&self, scope: CodeScopeHandle, expr: CodeExprHandle) -> bool {
         self.parent_map[&scope].contains(self.expr_to_code_scope.get(&expr).unwrap())
     }
-    pub fn parent_has_sub_expr(&self, scope: CodeScopeHandle, sub_expr: CodeSubExprHandle) -> bool {
-        self.parent_map[&scope].contains(self.sub_expr_to_code_scope.get(&sub_expr).unwrap())
-    }
     pub fn expr_to_type(&self, expr: CodeExprHandle) -> TypeHandle {
         *self
             .expr_type_map
             .get(&expr)
             .unwrap_or_else(|| blub_compile_error!("type expected to be known by this point"))
-    }
-    pub fn sub_expr_to_type(&self, sub_expr: CodeSubExprHandle) -> TypeHandle {
-        *self.sub_expr_type_map.get(&sub_expr).unwrap()
     }
     pub fn expr_to_static_type(&self, expr: CodeExprHandle) -> TypeHandle {
         *self.expr_to_static_type.get(&expr).unwrap_or_else(|| {
@@ -1449,42 +1573,16 @@ impl CodeScopeParser {
 
         expr
     }
-    pub fn sub_expr_to_static_type(&self, sub_expr: CodeSubExprHandle) -> TypeHandle {
-        *self.sub_expr_to_static_type.get(&sub_expr).unwrap()
-    }
     pub fn get_analysis_expr(&self, expr: CodeExprHandle) -> AnalysisExpr {
         self.expr_to_analysis.get(&expr).unwrap().clone()
     }
     pub fn scope_of_expr(&self, expr: CodeExprHandle) -> CodeScopeHandle {
         *self.expr_to_code_scope.get(&expr).unwrap()
     }
-    pub fn scope_of_sub_expr(&self, sub_expr: CodeSubExprHandle) -> CodeScopeHandle {
-        *self.sub_expr_to_code_scope.get(&sub_expr).unwrap()
-    }
-    pub fn sub_expr_from_expr(
-        &mut self,
-        scope: CodeScopeHandle,
-        expr: CodeExprHandle,
-    ) -> CodeSubExprHandle {
-        let new_handle = self.new_sub_expr(scope);
-        self.sub_expr_type_map
-            .insert(new_handle, self.expr_to_type(expr));
-        if let Some(static_type) = self.expr_to_static_type.get(&expr) {
-            self.sub_expr_to_static_type
-                .insert(new_handle, *static_type);
-        }
-        new_handle
-    }
     pub fn new_expr(&mut self, scope: CodeScopeHandle) -> CodeExprHandle {
         let handle = CodeExprHandle(self.next_expr_handle);
         self.next_expr_handle += 1;
         self.expr_to_code_scope.insert(handle, scope);
-        handle
-    }
-    pub fn new_sub_expr(&mut self, scope: CodeScopeHandle) -> CodeSubExprHandle {
-        let handle = CodeSubExprHandle(self.next_sub_expr_handle);
-        self.next_sub_expr_handle += 1;
-        self.sub_expr_to_code_scope.insert(handle, scope);
         handle
     }
     pub fn new_scope(
@@ -1530,13 +1628,21 @@ impl CodeScopeParser {
     }
 }
 impl CodeScopeParser {
-    pub fn get_var_expr_handle_scope(&self, scope_handle: CodeScopeHandle, name: &String) {
+    pub fn get_var_expr_handle_scope(
+        &self,
+        scope_handle: CodeScopeHandle,
+        name: &String,
+    ) -> Option<(CodeExprHandle, CodeScopeHandle)> {
         let scope = self.get_scope_ref(scope_handle);
-        scope.get_var_expr_handle(name, self);
+        scope.get_var_expr_handle(name, self)
     }
-    pub fn get_var_type_scope(&self, scope_handle: CodeScopeHandle, name: &String) {
+    pub fn get_var_type_scope(
+        &self,
+        scope_handle: CodeScopeHandle,
+        name: &String,
+    ) -> Option<(TypeHandle, CodeScopeHandle)> {
         let scope = self.get_scope_ref(scope_handle);
-        scope.get_var_type(name, self);
+        scope.get_var_type(name, self)
     }
     pub fn parse_code_block_scope(
         &mut self,
@@ -1544,17 +1650,16 @@ impl CodeScopeParser {
         block: Vec<Stmt>,
         data: &CodeAnalyzerData,
     ) {
-        let scope = self.get_scope_mut(scope_handle);
-        scope.parse_code_block(block, data);
+        self.get_scope_mut(scope_handle)
+            .parse_code_block(block, data);
     }
     pub fn parse_ast_expr_scope(
         &mut self,
         scope_handle: CodeScopeHandle,
         expr: Expr,
         data: &CodeAnalyzerData,
-    ) {
-        let scope = self.get_scope_mut(scope_handle);
-        scope.parse_ast_expr(expr, data);
+    ) -> CodeExprHandle {
+        self.get_scope_mut(scope_handle).parse_ast_expr(expr, data)
     }
     pub fn parse_ast_stmt_scope(
         &mut self,
@@ -1562,15 +1667,13 @@ impl CodeScopeParser {
         expr: Stmt,
         data: &CodeAnalyzerData,
     ) {
-        let scope = self.get_scope_mut(scope_handle);
-        scope.parse_ast_stmt(expr, data);
+        self.get_scope_mut(scope_handle).parse_ast_stmt(expr, data);
     }
 }
 impl Default for CodeScopeParser {
     fn default() -> Self {
         Self {
             next_expr_handle: 1,
-            next_sub_expr_handle: 1,
             next_scope_handle: 1,
             next_infer_type_handle: 1,
             expr_graph: Default::default(),
@@ -1583,9 +1686,7 @@ impl Default for CodeScopeParser {
             expr_to_analysis: Default::default(),
             expr_to_static_type: Default::default(),
             expr_to_code_scope: Default::default(),
-            sub_expr_type_map: Default::default(),
-            sub_expr_to_static_type: Default::default(),
-            sub_expr_to_code_scope: Default::default(),
+            expr_mutability_map: Default::default(),
             expr_debug_name: Default::default(),
             parent_map: Default::default(),
             scopes: Default::default(),
