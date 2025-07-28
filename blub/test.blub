@@ -13,3 +13,20 @@ fn print_u32(x: u32): u8 {
 fn print_u64(x: u64) {}
 fn print_u32_arr(x: []u32) {}
 fn print_u64_arr(x: []u64) {}
+
+
+
+fn main() {
+	
+}
+gen iterate_arr(arr: []i32): Option<i32> {
+	let mut i = 0;
+	loop {
+		println("at iteration: {}", i);
+		yield Some(arr[i]);
+		if i == arr.len() -1 {
+			return None;
+		}
+		i += 1;
+	}
+} 
