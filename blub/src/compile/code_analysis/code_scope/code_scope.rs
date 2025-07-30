@@ -18,11 +18,16 @@ use crate::{
 
 use super::ast_analysis::{AnalysisExpr, AnalysisStmt, AnalysisStructField, ArrayInitAnalysisKind};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Mutability {
-    Mutable,
-    Immutable,
-    Invalid,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExprMutability {
+    /// a functions return value can be mutated by methods on it, but the return value itself cannot be reassigned
+    MutableNoAssign,
+    MutableAssign,
+    Immunatble,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CodeExprFlags {
+    pub mutable: ExprMutability,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -134,6 +139,12 @@ impl CodeScope {
         match expr {
             Expr::Number(number) => {
                 let expr_handle = parser.new_expr(self.handle);
+                parser.set_expr_flags(
+                    expr_handle,
+                    CodeExprFlags {
+                        mutable: ExprMutability::MutableNoAssign,
+                    },
+                );
                 let analysis_expr = AnalysisExpr::Number {
                     num: number.clone(),
                     expr: expr_handle,
@@ -159,6 +170,12 @@ impl CodeScope {
             }
             Expr::String(string) => {
                 let expr_handle = parser.new_expr(self.handle);
+                parser.set_expr_flags(
+                    expr_handle,
+                    CodeExprFlags {
+                        mutable: ExprMutability::MutableNoAssign,
+                    },
+                );
                 let analysis_expr = AnalysisExpr::String {
                     string: string.clone(),
                     expr: expr_handle,
@@ -194,10 +211,23 @@ impl CodeScope {
                         var_expr_handle,
                         format!("ident variable {}", base_name),
                     );
+                    parser.set_expr_flags(expr_handle, parser.get_expr_flags(var_expr_handle));
                 } else if let Some(fn_type) = type_reg.fn_name_to_handle.get(&base_name) {
                     parser.expr_type_map.insert(expr_handle, *fn_type);
+                    parser.set_expr_flags(
+                        expr_handle,
+                        CodeExprFlags {
+                            mutable: ExprMutability::Immunatble,
+                        },
+                    );
                 } else if let Some(struct_type) = type_reg.struct_name_to_handle.get(&base_name) {
                     parser.expr_to_static_type.insert(expr_handle, *struct_type);
+                    parser.set_expr_flags(
+                        expr_handle,
+                        CodeExprFlags {
+                            mutable: ExprMutability::Immunatble,
+                        },
+                    );
                     parser
                         .expr_type_map
                         .insert(expr_handle, type_reg.get_type_handle(&TypeInfo::StaticType));
@@ -229,6 +259,19 @@ impl CodeScope {
                         name: struct_name,
                         fields,
                     } => {
+                        parser.set_expr_flags(
+                            expr_handle,
+                            CodeExprFlags {
+                                mutable: match parser.get_expr_flags(left_expr_handle).mutable {
+                                    ExprMutability::MutableNoAssign
+                                    | ExprMutability::MutableAssign => {
+                                        ExprMutability::MutableAssign
+                                    }
+
+                                    ExprMutability::Immunatble => ExprMutability::Immunatble,
+                                },
+                            },
+                        );
                         let mut field_type = None;
                         for field in fields {
                             if field.name == ident {
@@ -308,6 +351,12 @@ impl CodeScope {
                         args.push(arg_expr_handle);
                     }
                     let expr_handle = parser.new_expr(self.handle);
+                    parser.set_expr_flags(
+                        expr_handle,
+                        CodeExprFlags {
+                            mutable: ExprMutability::MutableNoAssign,
+                        },
+                    );
                     parser.expr_type_map.insert(expr_handle, return_type);
                     parser.expr_to_analysis.insert(
                         expr_handle,
@@ -395,7 +444,12 @@ impl CodeScope {
                         .expr_type_map
                         .insert(expr_handle, parser.expr_to_type(left_expr_handle));
                 }
-
+                parser.set_expr_flags(
+                    expr_handle,
+                    CodeExprFlags {
+                        mutable: ExprMutability::MutableNoAssign,
+                    },
+                );
                 parser.expr_to_analysis.insert(
                     expr_handle,
                     AnalysisExpr::Arithmetic {
@@ -462,6 +516,12 @@ impl CodeScope {
                 parser
                     .expr_type_map
                     .insert(expr_handle, type_reg.get_type_handle(&TypeInfo::Bool));
+                parser.set_expr_flags(
+                    expr_handle,
+                    CodeExprFlags {
+                        mutable: ExprMutability::MutableNoAssign,
+                    },
+                );
 
                 parser.expr_to_analysis.insert(
                     expr_handle,
@@ -519,6 +579,12 @@ impl CodeScope {
                 parser
                     .expr_type_map
                     .insert(expr_handle, type_reg.get_type_handle(&TypeInfo::Unit));
+                match parser.get_expr_flags(left_expr_handle).mutable {
+                    ExprMutability::MutableAssign => (),
+                    ExprMutability::Immunatble | ExprMutability::MutableNoAssign => {
+                        blub_compile_error!("tried to assign a value to unassignable expression");
+                    }
+                }
 
                 parser.expr_to_analysis.insert(
                     expr_handle,
@@ -576,6 +642,13 @@ impl CodeScope {
                 parser
                     .expr_type_map
                     .insert(expr_handle, type_reg.get_type_handle(&TypeInfo::Unit));
+
+                parser.set_expr_flags(
+                    expr_handle,
+                    CodeExprFlags {
+                        mutable: ExprMutability::MutableNoAssign,
+                    },
+                );
 
                 parser.expr_to_analysis.insert(
                     expr_handle,
@@ -649,6 +722,14 @@ impl CodeScope {
 
                 let expr_handle = parser.new_expr(self.handle);
                 parser.expr_type_map.insert(expr_handle, struct_type_handle);
+
+                parser.set_expr_flags(
+                    expr_handle,
+                    CodeExprFlags {
+                        mutable: ExprMutability::MutableNoAssign,
+                    },
+                );
+
                 parser.expr_to_analysis.insert(
                     expr_handle,
                     AnalysisExpr::StructCreate {
@@ -700,6 +781,18 @@ impl CodeScope {
                         )
                     });
 
+                parser.set_expr_flags(
+                    expr_handle,
+                    CodeExprFlags {
+                        mutable: match parser.get_expr_flags(base_expr_handle).mutable {
+                            ExprMutability::MutableNoAssign | ExprMutability::MutableAssign => {
+                                ExprMutability::MutableAssign
+                            }
+                            ExprMutability::Immunatble => ExprMutability::Immunatble,
+                        },
+                    },
+                );
+
                 parser.expr_to_analysis.insert(
                     expr_handle,
                     AnalysisExpr::Index {
@@ -739,7 +832,21 @@ impl CodeScope {
                             ),
                         }),
                     );
-                };
+                }
+                if is_mut {
+                    match parser.get_expr_flags(pointee).mutable {
+                        ExprMutability::MutableNoAssign | ExprMutability::MutableAssign => (),
+                        ExprMutability::Immunatble => blub_compile_error!(
+                            "tried to take mutable reference to expr which is not mutable"
+                        ),
+                    }
+                }
+                parser.set_expr_flags(
+                    expr_handle,
+                    CodeExprFlags {
+                        mutable: ExprMutability::MutableNoAssign,
+                    },
+                );
                 parser.expr_to_analysis.insert(
                     expr_handle,
                     AnalysisExpr::Ref {
@@ -886,6 +993,12 @@ impl CodeScope {
                                     }
                                     item_expr_handle
                                 }).collect::<Vec<_>>();
+                        parser.set_expr_flags(
+                            expr,
+                            CodeExprFlags {
+                                mutable: ExprMutability::MutableNoAssign,
+                            },
+                        );
                         parser.expr_to_analysis.insert(
                             expr,
                             AnalysisExpr::ArrayInit {
@@ -908,6 +1021,12 @@ impl CodeScope {
                     data,
                 );
 
+                parser.set_expr_flags(
+                    expr_handle,
+                    CodeExprFlags {
+                        mutable: ExprMutability::MutableNoAssign,
+                    },
+                );
                 parser.expr_to_analysis.insert(
                     expr_handle,
                     AnalysisExpr::Unary {
@@ -960,70 +1079,13 @@ impl CodeScope {
             }
         }
     }
-    /*
-
-            Expr::Index { base, index } => {
-                let expr_handle = parser.new_expr(self.handle);
-                let base_expr_handle = self.parse_ast_expr(*base, data);
-                let index_expr_handle = self.parse_ast_expr(*index, data);
-
-                if parser
-                    .copy_type_or_infer_handle(
-                        base_expr_handle,
-                        expr_handle,
-                        Box::new(|handle, reg| {
-                            reg.get_type_info(handle).into_array().unwrap_or_else(|_| {
-                                blub_compile_error!("only arrays can be indexed")
-                            })
-                        }),
-                        data,
-                    )
-                    .is_some()
-                {
-                    parser.add_infer_transformer(
-                        expr_handle,
-                        Box::new(|info, reg| {
-                            reg.get_or_add_type(TypeInfo::Array {
-                                handle: reg.get_type_handle(&info),
-                            })
-                        }),
-                    );
-                };
-
-                parser
-                    .get_expected_info_expr_type(
-                        index_expr_handle,
-                        TypeInfo::Number(NumberTypes::Usize),
-                        data,
-                    )
-                    .unwrap_or_else(|found| {
-                        blub_compile_error!(
-                            "indexes into arrays need to have type usize, but was {}",
-                            type_reg.type_to_string(found)
-                        )
-                    });
-
-                parser.expr_to_analysis.insert(
-                    expr_handle,
-                    AnalysisExpr::Index {
-                        base: base_expr_handle,
-                        index: index_expr_handle,
-                        expr: expr_handle,
-                    },
-                );
-
-                expr_handle
-            }
-
-
-    */
     pub fn parse_ast_stmt(&mut self, stmt: Stmt, data: &CodeAnalyzerData) {
         let type_reg = data.get_mut::<TypeRegistry>();
         let parser = data.get_mut::<CodeScopeParser>();
         match stmt.clone() {
             Stmt::VarDecl {
                 name,
-                is_mut: _,
+                is_mut,
                 init_value,
             } => {
                 let parent_handle = self.handle;
@@ -1038,6 +1100,10 @@ impl CodeScope {
                 }
                 let init_expr_handle =
                     parser.parse_ast_expr_scope(parent_handle, init_value.unwrap(), data);
+                parser.get_expr_flags_mut(init_expr_handle).mutable = match is_mut {
+                    true => ExprMutability::MutableAssign,
+                    false => ExprMutability::Immunatble,
+                };
                 let parent_scope = parser.get_scope_mut(parent_handle);
                 parent_scope
                     .var_name_to_expr
@@ -1193,6 +1259,12 @@ impl CodeScope {
                 for (i, arg) in args.iter().enumerate() {
                     let arg_type = type_fn_args[i];
                     let arg_expr_handle = parser.new_expr(parent_handle);
+                    parser.set_expr_flags(
+                        arg_expr_handle,
+                        CodeExprFlags {
+                            mutable: ExprMutability::Immunatble,
+                        },
+                    );
                     parser.expr_type_map.insert(arg_expr_handle, arg_type);
                     parser.expr_to_analysis.insert(
                         arg_expr_handle,
@@ -1327,7 +1399,7 @@ pub struct CodeScopeParser {
     pub expr_to_analysis: HashMap<CodeExprHandle, AnalysisExpr>,
     pub expr_to_static_type: HashMap<CodeExprHandle, TypeHandle>,
     pub expr_to_code_scope: HashMap<CodeExprHandle, CodeScopeHandle>,
-    pub expr_mutability_map: HashMap<CodeExprHandle, Mutability>,
+    pub expr_flag_map: HashMap<CodeExprHandle, CodeExprFlags>,
     //
     pub expr_debug_name: HashMap<CodeExprHandle, String>,
     //
@@ -1563,6 +1635,7 @@ impl CodeScopeParser {
     }
     pub fn clone_expr(&mut self, handle: CodeExprHandle, dep: &CodeAnalyzerData) -> CodeExprHandle {
         let expr = self.new_expr(*self.expr_to_code_scope.get(&handle).unwrap());
+        self.set_expr_flags(expr, self.get_expr_flags(handle));
 
         self.copy_type_or_infer_handle(handle, expr, Box::new(|type_handle, _| type_handle), dep);
         self.expr_to_analysis
@@ -1578,6 +1651,15 @@ impl CodeScopeParser {
     }
     pub fn scope_of_expr(&self, expr: CodeExprHandle) -> CodeScopeHandle {
         *self.expr_to_code_scope.get(&expr).unwrap()
+    }
+    pub fn set_expr_flags(&mut self, expr: CodeExprHandle, flags: CodeExprFlags) {
+        self.expr_flag_map.insert(expr, flags);
+    }
+    pub fn get_expr_flags(&self, expr: CodeExprHandle) -> CodeExprFlags {
+        *self.expr_flag_map.get(&expr).unwrap()
+    }
+    pub fn get_expr_flags_mut(&mut self, expr: CodeExprHandle) -> &mut CodeExprFlags {
+        self.expr_flag_map.get_mut(&expr).unwrap()
     }
     pub fn new_expr(&mut self, scope: CodeScopeHandle) -> CodeExprHandle {
         let handle = CodeExprHandle(self.next_expr_handle);
@@ -1686,7 +1768,7 @@ impl Default for CodeScopeParser {
             expr_to_analysis: Default::default(),
             expr_to_static_type: Default::default(),
             expr_to_code_scope: Default::default(),
-            expr_mutability_map: Default::default(),
+            expr_flag_map: Default::default(),
             expr_debug_name: Default::default(),
             parent_map: Default::default(),
             scopes: Default::default(),
